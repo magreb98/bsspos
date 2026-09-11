@@ -1,0 +1,8 @@
+{
+    "name": "modules/commerce",
+    "autoload": {
+        "psr-4": {
+            "Modules\\Commerce\\": "src/"
+        }
+    }
+}

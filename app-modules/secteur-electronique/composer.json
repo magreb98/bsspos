@@ -1,0 +1,8 @@
+{
+    "name": "modules/secteur-electronique",
+    "autoload": {
+        "psr-4": {
+            "Modules\\SecteurElectronique\\": "src/"
+        }
+    }
+}

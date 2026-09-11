@@ -1,0 +1,32 @@
+deptrac:
+  paths: ['./app', './app-modules']
+  layers:
+    - name: Platform
+      collectors: [{ type: directory, value: 'app/Platform/.*' }]
+
+    - name: DomaineCommerce
+      collectors: [{ type: directory, value: 'app-modules/commerce/src/Internal/.*' }]
+
+    - name: DomaineCommercePublic
+      collectors: [{ type: directory, value: 'app-modules/commerce/src/Public/.*' }]
+
+    - name: ContractCommerce
+      collectors: [{ type: directory, value: 'app-modules/commerce/src/Contracts/.*' }]
+
+    - name: DomaineCommerceHttp
+      collectors: [{ type: directory, value: 'app-modules/commerce/src/Http/.*' }]
+
+    - name: SecteurElectronique
+      collectors: [{ type: directory, value: 'app-modules/secteur-electronique/src/.*' }]
+
+    - name: SecteurMode
+      collectors: [{ type: directory, value: 'app-modules/secteur-mode/src/.*' }]
+
+  ruleset:
+    Platform: []
+    DomaineCommerce: [Platform, DomaineCommercePublic]
+    DomaineCommercePublic: [Platform]
+    ContractCommerce: [Platform, DomaineCommerce]
+    DomaineCommerceHttp: [Platform, DomaineCommerce]
+    SecteurElectronique: [Platform, DomaineCommerce, ContractCommerce]
+    SecteurMode: [Platform, DomaineCommercePublic]

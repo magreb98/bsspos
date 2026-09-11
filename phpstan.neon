@@ -1,0 +1,47 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/pestphp/pest/extension.neon
+    - vendor/pestphp/pest/phpstan-pest-extension.neon
+
+parameters:
+    paths:
+        - app
+        - app-modules
+        - tests
+    level: 8
+    databaseMigrationsPath:
+        - database/migrations
+        - database/migrations/tenant
+        - app-modules/commerce/database/migrations
+        - app-modules/secteur-electronique/database/migrations
+    ignoreErrors: []
+    excludePaths:
+        # False positives not resolved by Pest + Larastan extensions:
+        #   - ->artisan() / ->withHeaders(): TestCall mixin methods not seen by PHPStan
+        #   - $tenant->id: dynamic property of Stancl contract not declared
+        - tests/Feature/Tenancy/RoutingTest.php
+        - tests/Feature/Tenancy/OrchestratorsTest.php
+        - tests/Feature/Identity/UserTest.php
+        - tests/Feature/Identity/CachePermissionsTest.php
+        - tests/Feature/Identity/PerimeterTest.php
+        - tests/Feature/Identity/ProvisionStep4Test.php
+        - tests/Feature/Audit/AuditTest.php
+        - tests/Feature/Idempotence/IdempotenceTest.php
+        - tests/Feature/Outbox/OutboxTest.php
+        - tests/Feature/Sequence/SequenceTest.php
+        - tests/Feature/Registry/RegistryServiceProviderTest.php
+        - tests/Feature/Mcp/McpServerTest.php
+        - tests/Feature/Electronics/HttpInfrastructureTest.php
+        - tests/Feature/Electronics/DeviceSpecEndpointTest.php
+        - tests/Feature/Electronics/SerialUnitEndpointTest.php
+        - tests/Feature/Electronics/ServiceTicketEndpointTest.php
+        - tests/Feature/Electronics/WarrantyPaymentScheduleEndpointTest.php
+        - tests/Feature/Electronics/InstallmentEndpointTest.php
+        - tests/Feature/Commerce/ProductImageEndpointTest.php
+        - tests/Feature/Commerce/ProductImageUploadEndpointTest.php
+        - tests/Feature/Rbac/CommerceRbacTest.php
+        - tests/Feature/Rbac/ElectronicsRbacTest.php
+        - tests/Feature/Commerce/CommerceReferentialEndpointTest.php
+        - tests/Feature/Commerce/CommerceCashSaleEndpointTest.php
+        - tests/Feature/Commerce/CommercePromotionTest.php
+        - tests/Feature/Commerce/CommerceLot3456EndpointTest.php
