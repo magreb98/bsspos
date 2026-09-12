@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\UpdateInvoiceSettingRequest;
+use Modules\Commerce\Http\Resources\InvoiceSettingResource;
 use Modules\Commerce\Internal\Models\InvoiceSetting;
 
 final class InvoiceSettingController
@@ -18,18 +19,12 @@ final class InvoiceSettingController
             return response()->json(['data' => null]);
         }
 
-        return response()->json(['data' => $setting->toArray()]);
+        return response()->json(['data' => new InvoiceSettingResource($setting)]);
     }
 
-    public function update(Request $request): JsonResponse
+    public function update(UpdateInvoiceSettingRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'company_name' => ['sometimes', 'string', 'max:255'],
-            'niu'          => ['sometimes', 'nullable', 'string', 'max:50'],
-            'rccm'         => ['sometimes', 'nullable', 'string', 'max:50'],
-            'address'      => ['sometimes', 'nullable', 'string', 'max:500'],
-            'phone'        => ['sometimes', 'nullable', 'string', 'max:30'],
-        ]);
+        $validated = $request->validated();
 
         $setting = InvoiceSetting::first();
 
@@ -39,6 +34,6 @@ final class InvoiceSettingController
             $setting->update($validated);
         }
 
-        return response()->json(['data' => $setting->fresh()?->toArray() ?? $setting->toArray()]);
+        return response()->json(['data' => new InvoiceSettingResource($setting->fresh() ?? $setting)]);
     }
 }

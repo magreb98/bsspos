@@ -10,7 +10,7 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::table('sales', function (Blueprint $table): void {
-            $table->date('valid_until')->nullable()->after('confirmed_at');
+            $table->date('valid_until')->nullable();
         });
     }
 

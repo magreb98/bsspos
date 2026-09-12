@@ -6,6 +6,8 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreTransferRequest;
+use Modules\Commerce\Http\Resources\TransferResource;
 use Modules\Commerce\Internal\Enums\TransferStatus;
 use Modules\Commerce\Internal\Models\PointOfSale;
 use Modules\Commerce\Internal\Models\Transfer;
@@ -25,19 +27,12 @@ final class TransferController
             $query->where('status', $request->input('status'));
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json(['data' => TransferResource::collection($query->get())]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTransferRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'source_pos_id'      => 'required|uuid',
-            'destination_pos_id' => 'required|uuid',
-            'notes'              => 'nullable|string|max:1000',
-            'lines'              => 'required|array|min:1',
-            'lines.*.product_id' => 'required|uuid',
-            'lines.*.quantity'   => 'required|integer|min:1',
-        ]);
+        $data = $request->validated();
 
         PointOfSale::findOrFail($data['source_pos_id']);
         PointOfSale::findOrFail($data['destination_pos_id']);
@@ -56,12 +51,14 @@ final class TransferController
             ]);
         }
 
-        return response()->json(['data' => $transfer->fresh()?->load('lines.product', 'sourcePos', 'destinationPos')], 201);
+        $freshTransfer = $transfer->fresh()?->load('lines.product', 'sourcePos', 'destinationPos');
+
+        return response()->json(['data' => $freshTransfer !== null ? new TransferResource($freshTransfer) : null], 201);
     }
 
     public function show(Transfer $transfer): JsonResponse
     {
-        return response()->json(['data' => $transfer->load('lines.product', 'sourcePos', 'destinationPos')]);
+        return response()->json(['data' => new TransferResource($transfer->load('lines.product', 'sourcePos', 'destinationPos'))]);
     }
 
     public function dispatch(Transfer $transfer): JsonResponse
@@ -72,7 +69,7 @@ final class TransferController
             return response()->json(['code' => 'INVALID_STATE', 'message' => $e->getMessage()], 409);
         }
 
-        return response()->json(['data' => $transfer->fresh()]);
+        return response()->json(['data' => new TransferResource($transfer->fresh() ?? $transfer)]);
     }
 
     public function receive(Transfer $transfer): JsonResponse
@@ -83,6 +80,6 @@ final class TransferController
             return response()->json(['code' => 'INVALID_STATE', 'message' => $e->getMessage()], 409);
         }
 
-        return response()->json(['data' => $transfer->fresh()]);
+        return response()->json(['data' => new TransferResource($transfer->fresh() ?? $transfer)]);
     }
 }

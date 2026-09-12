@@ -42,14 +42,21 @@ use Modules\Commerce\Http\Controllers\UserController;
 
 // ── Authentification (pas besoin d'être authentifié) ─────────────────────────
 Route::prefix('commerce/auth')->name('commerce.auth.')->group(function (): void {
-    Route::post('login', [AuthController::class, 'login'])->name('login');
+    Route::post('login', [AuthController::class, 'login'])
+        ->middleware('throttle:member-login')
+        ->name('login');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('me', [AuthController::class, 'me'])
         ->name('me')
         ->middleware(AuthenticateMemberRequest::class);
+    // Reachable even while must_change_password is still true — see
+    // AuthenticateMemberRequest, which otherwise blocks every other route.
+    Route::post('change-password', [AuthController::class, 'changePassword'])
+        ->name('change-password')
+        ->middleware(AuthenticateMemberRequest::class);
 });
 
-Route::prefix('commerce')->name('commerce.')->middleware(AuthenticateMemberRequest::class)->group(function (): void {
+Route::prefix('commerce')->name('commerce.')->middleware([AuthenticateMemberRequest::class, 'throttle:api'])->group(function (): void {
 
     // ── Paramètres entreprise ─────────────────────────────────────────────────
     Route::middleware('permission:invoice-settings.manage')->group(function (): void {

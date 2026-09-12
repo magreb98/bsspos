@@ -8,7 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Commerce\Internal\Models\SaleLine;
 use Modules\SecteurElectronique\Enums\SerialStatus;
-use Modules\SecteurElectronique\Http\Data\StoreWarrantyData;
+use Modules\SecteurElectronique\Http\Requests\StoreWarrantyRequest;
+use Modules\SecteurElectronique\Http\Resources\WarrantyResource;
 use Modules\SecteurElectronique\Models\SerialUnit;
 use Modules\SecteurElectronique\Models\Warranty;
 use Modules\SecteurElectronique\Services\WarrantyService;
@@ -31,7 +32,7 @@ final class WarrantyController
         $paginator = $query->paginate(15);
 
         return response()->json([
-            'data' => array_map(fn (Warranty $w) => $w->toArray(), $paginator->items()),
+            'data' => array_map(fn (Warranty $w) => new WarrantyResource($w), $paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -41,13 +42,9 @@ final class WarrantyController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreWarrantyRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'serial_unit_id'  => ['required', 'uuid'],
-            'sale_line_id'    => ['required', 'uuid'],
-            'duration_months' => ['required', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $unit = SerialUnit::query()->whereKey($validated['serial_unit_id'])->first();
         if ($unit === null) {
@@ -83,15 +80,13 @@ final class WarrantyController
             ], 404);
         }
 
-        $_ = StoreWarrantyData::from($validated);
-
         $warranty = $this->service->issue($unit, $line, (int) $validated['duration_months']);
 
-        return response()->json(['data' => $warranty->toArray()], 201);
+        return response()->json(['data' => new WarrantyResource($warranty)], 201);
     }
 
     public function show(Warranty $warranty): JsonResponse
     {
-        return response()->json(['data' => $warranty->toArray()]);
+        return response()->json(['data' => new WarrantyResource($warranty)]);
     }
 }

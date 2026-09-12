@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreProductVariantRequest;
+use Modules\Commerce\Http\Requests\UpdateProductVariantRequest;
+use Modules\Commerce\Http\Resources\ProductVariantResource;
 use Modules\Commerce\Internal\Models\Product;
 use Modules\Commerce\Internal\Models\ProductVariant;
 
@@ -15,15 +17,12 @@ final class ProductVariantController
     {
         $variants = $product->variants()->with('stockLevels')->get();
 
-        return response()->json(['data' => $variants->toArray()]);
+        return response()->json(['data' => ProductVariantResource::collection($variants)]);
     }
 
-    public function store(Request $request, Product $product): JsonResponse
+    public function store(StoreProductVariantRequest $request, Product $product): JsonResponse
     {
-        $validated = $request->validate([
-            'label'     => ['required', 'string', 'max:255'],
-            'reference' => ['required', 'string', 'max:100', 'unique:product_variants,reference'],
-        ]);
+        $validated = $request->validated();
 
         $variant = ProductVariant::create([
             'product_id' => $product->id,
@@ -32,18 +31,15 @@ final class ProductVariantController
             'active'     => true,
         ]);
 
-        return response()->json(['data' => $variant->toArray()], 201);
+        return response()->json(['data' => new ProductVariantResource($variant)], 201);
     }
 
-    public function update(Request $request, ProductVariant $productVariant): JsonResponse
+    public function update(UpdateProductVariantRequest $request, ProductVariant $productVariant): JsonResponse
     {
-        $validated = $request->validate([
-            'label'  => ['sometimes', 'string', 'max:255'],
-            'active' => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $productVariant->update($validated);
 
-        return response()->json(['data' => $productVariant->fresh()?->toArray() ?? $productVariant->toArray()]);
+        return response()->json(['data' => new ProductVariantResource($productVariant->fresh() ?? $productVariant)]);
     }
 }

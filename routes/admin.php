@@ -24,10 +24,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('admin')->name('admin.')->group(function (): void {
 
     // ── Public ───────────────────────────────────────────────────────────────
-    Route::post('login', [AuthController::class, 'login'])->name('login');
+    Route::post('login', [AuthController::class, 'login'])
+        ->middleware('throttle:admin-login')
+        ->name('login');
 
     // ── Protected ────────────────────────────────────────────────────────────
-    Route::middleware('authenticate.admin')->group(function (): void {
+    Route::middleware(['authenticate.admin', 'throttle:api'])->group(function (): void {
 
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me', [AuthController::class, 'me'])->name('me');

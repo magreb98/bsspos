@@ -9,7 +9,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Commerce\Internal\Models\InvoiceSetting;
 use Modules\Commerce\Internal\Models\Sale;
-use Modules\SecteurElectronique\Http\Data\StorePaymentScheduleData;
+use Modules\SecteurElectronique\Http\Requests\StorePaymentScheduleRequest;
+use Modules\SecteurElectronique\Http\Resources\PaymentScheduleResource;
+use Modules\SecteurElectronique\Http\Resources\PaymentScheduleSummaryResource;
 use Modules\SecteurElectronique\Models\PaymentSchedule;
 use Modules\SecteurElectronique\Services\PaymentScheduleService;
 use Spatie\LaravelPdf\Facades\Pdf;
@@ -32,7 +34,7 @@ final class PaymentScheduleController
 
         $paginator = $query->paginate(15);
 
-        $data = array_map(fn (PaymentSchedule $s) => $this->serializeSchedule($s), $paginator->items());
+        $data = array_map(fn (PaymentSchedule $s) => new PaymentScheduleSummaryResource($s), $paginator->items());
 
         return response()->json([
             'data' => $data,
@@ -45,59 +47,9 @@ final class PaymentScheduleController
         ]);
     }
 
-    /** @return array<string, mixed> */
-    private function serializeSchedule(PaymentSchedule $s): array
+    public function store(StorePaymentScheduleRequest $request): JsonResponse
     {
-        $installments    = $s->installments;
-        $paidInstallments = $installments->filter(fn ($i) => $i->paid_at !== null);
-        $paidAmount      = $paidInstallments->sum('amount');
-        $count           = $installments->count();
-        $paidCount       = $paidInstallments->count();
-
-        $now = now();
-        $hasOverdue = $installments
-            ->filter(fn ($i) => $i->paid_at === null && $now->isAfter($i->due_on))
-            ->isNotEmpty();
-
-        $status = match (true) {
-            $count > 0 && $paidCount === $count => 'completed',
-            $hasOverdue                          => 'overdue',
-            default                              => 'active',
-        };
-
-        $nextInstallment = $installments
-            ->filter(fn ($i) => $i->paid_at === null)
-            ->sortBy('due_on')
-            ->first();
-
-        return [
-            ...$s->toArray(),
-            'total_amount'             => $s->total,
-            'paid_amount'              => $paidAmount,
-            'installments_count'       => $count,
-            'paid_installments_count'  => $paidCount,
-            'status'                   => $status,
-            'next_installment_date'    => $nextInstallment?->due_on,
-            'sale'                     => $s->sale ? [
-                'id'     => $s->sale->id,
-                'number' => $s->sale->number,
-            ] : null,
-            'client' => $s->sale?->customer ? [
-                'id'   => $s->sale->customer->id,
-                'name' => $s->sale->customer->name,
-            ] : null,
-        ];
-    }
-
-    public function store(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'sale_id'               => ['required', 'uuid'],
-            'deposit'               => ['required', 'integer', 'min:0'],
-            'installments'          => ['required', 'array', 'min:1'],
-            'installments.*.amount' => ['required', 'integer', 'min:1'],
-            'installments.*.due_on' => ['required', 'string', 'date_format:Y-m-d'],
-        ]);
+        $validated = $request->validated();
 
         $sale = Sale::query()->whereKey($validated['sale_id'])->first();
         if ($sale === null) {
@@ -116,12 +68,6 @@ final class PaymentScheduleController
             ], 409);
         }
 
-        $_ = StorePaymentScheduleData::from([
-            'sale_id'      => $validated['sale_id'],
-            'deposit'      => $validated['deposit'],
-            'installments' => $validated['installments'],
-        ]);
-
         try {
             $schedule = $this->service->create($sale, (int) $validated['deposit'], $validated['installments']);
         } catch (DomainException) {
@@ -134,14 +80,14 @@ final class PaymentScheduleController
 
         $schedule->load('installments');
 
-        return response()->json(['data' => $schedule->toArray()], 201);
+        return response()->json(['data' => new PaymentScheduleResource($schedule)], 201);
     }
 
     public function show(PaymentSchedule $paymentSchedule): JsonResponse
     {
         $paymentSchedule->load('installments');
 
-        return response()->json(['data' => $paymentSchedule->toArray()]);
+        return response()->json(['data' => new PaymentScheduleResource($paymentSchedule)]);
     }
 
     public function pdf(PaymentSchedule $paymentSchedule): Response

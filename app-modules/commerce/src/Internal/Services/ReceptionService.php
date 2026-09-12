@@ -7,6 +7,7 @@ namespace Modules\Commerce\Internal\Services;
 use Modules\Commerce\Internal\Enums\Granularity;
 use Modules\Commerce\Internal\Enums\SupplierOrderStatus;
 use Modules\Commerce\Internal\Models\PointOfSale;
+use Modules\Commerce\Internal\Models\Product;
 use Modules\Commerce\Internal\Models\Reception;
 use Modules\Commerce\Internal\Models\StockMovement;
 use Modules\Commerce\Internal\Models\SupplierOrder;
@@ -24,15 +25,18 @@ final class ReceptionService
             'received_at'       => now(),
         ]);
 
+        $productIds = array_values(array_unique(array_column($lines, 'product_id')));
+        $products   = Product::query()->whereIn('id', $productIds)->get()->keyBy('id');
+
         foreach ($lines as $line) {
-            $receptionLine = $reception->lines()->create([
+            $reception->lines()->create([
                 'product_id'        => $line['product_id'],
                 'quantity_expected' => $line['quantity_expected'],
                 'quantity_received' => $line['quantity_received'],
                 'unit_cost'         => $line['unit_cost'],
             ]);
 
-            $product = $receptionLine->product;
+            $product = $products->get($line['product_id']);
 
             if ($product !== null && $product->granularity === Granularity::Quantity && $line['quantity_received'] > 0) {
                 StockMovement::create([

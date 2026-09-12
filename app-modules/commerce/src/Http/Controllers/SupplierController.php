@@ -5,39 +5,38 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreSupplierRequest;
+use Modules\Commerce\Http\Requests\UpdateSupplierRequest;
+use Modules\Commerce\Http\Resources\SupplierResource;
 use Modules\Commerce\Internal\Models\Supplier;
 
 final class SupplierController
 {
     public function index(): JsonResponse
     {
-        return response()->json(['data' => Supplier::orderBy('name')->get()]);
+        return response()->json(['data' => SupplierResource::collection(Supplier::orderBy('name')->get())]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreSupplierRequest $request): JsonResponse
     {
-        $data = $request->validate(['name' => 'required|string|max:255']);
+        $data = $request->validated();
 
         $supplier = Supplier::create(['name' => $data['name'], 'active' => true]);
 
-        return response()->json(['data' => $supplier], 201);
+        return response()->json(['data' => new SupplierResource($supplier)], 201);
     }
 
     public function show(Supplier $supplier): JsonResponse
     {
-        return response()->json(['data' => $supplier->load('orders')]);
+        return response()->json(['data' => new SupplierResource($supplier->load('orders'))]);
     }
 
-    public function update(Request $request, Supplier $supplier): JsonResponse
+    public function update(UpdateSupplierRequest $request, Supplier $supplier): JsonResponse
     {
-        $data = $request->validate([
-            'name'   => 'sometimes|string|max:255',
-            'active' => 'sometimes|boolean',
-        ]);
+        $data = $request->validated();
 
         $supplier->update($data);
 
-        return response()->json(['data' => $supplier->fresh()]);
+        return response()->json(['data' => new SupplierResource($supplier->fresh() ?? $supplier)]);
     }
 }

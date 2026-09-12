@@ -6,6 +6,7 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Resources\StockLevelResource;
 use Modules\Commerce\Internal\Models\StockLevel;
 
 final class StockController
@@ -24,6 +25,6 @@ final class StockController
 
         $levels = $query->get();
 
-        return response()->json(['data' => $levels->toArray()]);
+        return response()->json(['data' => StockLevelResource::collection($levels)]);
     }
 }

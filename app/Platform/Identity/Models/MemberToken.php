@@ -24,16 +24,23 @@ final class MemberToken extends Model
         'name',
         'token',
         'last_used_at',
+        'expires_at',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'last_used_at' => 'datetime',
+        'expires_at'   => 'datetime',
     ];
 
     /** @return BelongsTo<User, $this> */
     public function member(): BelongsTo
     {
         return $this->belongsTo(User::class, 'member_id');
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->isPast();
     }
 }

@@ -6,6 +6,10 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\CloseCashSessionRequest;
+use Modules\Commerce\Http\Requests\ShowActiveCashSessionRequest;
+use Modules\Commerce\Http\Requests\StoreCashSessionRequest;
+use Modules\Commerce\Http\Resources\CashSessionResource;
 use Modules\Commerce\Internal\Enums\SessionState;
 use Modules\Commerce\Internal\Models\CashRegister;
 use Modules\Commerce\Internal\Models\CashSession;
@@ -35,7 +39,7 @@ final class CashSessionController
         $paginator = $query->paginate(20);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => CashSessionResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -45,12 +49,9 @@ final class CashSessionController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreCashSessionRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'cash_register_id' => ['required', 'uuid'],
-            'opening_balance'  => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $register = CashRegister::query()->whereKey($validated['cash_register_id'])->first();
         if ($register === null) {
@@ -76,14 +77,12 @@ final class CashSessionController
             'opened_by'        => $userId,
         ]);
 
-        return response()->json(['data' => $session->toArray()], 201);
+        return response()->json(['data' => new CashSessionResource($session)], 201);
     }
 
-    public function showActive(Request $request): JsonResponse
+    public function showActive(ShowActiveCashSessionRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'cash_register_id' => ['required', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $session = CashSession::query()
             ->where('cash_register_id', $validated['cash_register_id'])
@@ -94,22 +93,20 @@ final class CashSessionController
             return response()->json(['code' => 'NO_ACTIVE_SESSION', 'message' => 'Aucune session ouverte.', 'champ' => null], 404);
         }
 
-        return response()->json(['data' => $session->toArray()]);
+        return response()->json(['data' => new CashSessionResource($session)]);
     }
 
-    public function close(Request $request, CashSession $cash_session): JsonResponse
+    public function close(CloseCashSessionRequest $request, CashSession $cash_session): JsonResponse
     {
         if (! $cash_session->isOpen()) {
             return response()->json(['code' => 'SESSION_NOT_OPEN', 'message' => 'Cette session n\'est pas ouverte.', 'champ' => null], 409);
         }
 
-        $validated = $request->validate([
-            'closing_balance' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $userId = (string) $request->user()?->getAuthIdentifier();
         $cash_session->close($userId, $validated['closing_balance']);
 
-        return response()->json(['data' => $cash_session->fresh()?->toArray() ?? $cash_session->toArray()]);
+        return response()->json(['data' => new CashSessionResource($cash_session->fresh() ?? $cash_session)]);
     }
 }

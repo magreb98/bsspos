@@ -7,6 +7,9 @@ namespace Modules\Commerce\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Modules\Commerce\Http\Requests\StorePointOfSaleRequest;
+use Modules\Commerce\Http\Requests\UpdatePointOfSaleRequest;
+use Modules\Commerce\Http\Resources\PointOfSaleResource;
 use Modules\Commerce\Internal\Models\OrganizationalUnit;
 use Modules\Commerce\Internal\Models\PointOfSale;
 
@@ -28,15 +31,12 @@ final class PointOfSaleController
             $query->whereIn('id', $assignedIds);
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json(['data' => PointOfSaleResource::collection($query->get())]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePointOfSaleRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'name'                   => 'required|string|max:255',
-            'organizational_unit_id' => 'required|uuid',
-        ]);
+        $data = $request->validated();
 
         $unit = OrganizationalUnit::where('id', $data['organizational_unit_id'])->firstOrFail();
 
@@ -46,23 +46,22 @@ final class PointOfSaleController
             'active'                 => true,
         ]);
 
-        return response()->json(['data' => $pos->fresh()?->load('organizationalUnit')], 201);
+        $freshPos = $pos->fresh()?->load('organizationalUnit');
+
+        return response()->json(['data' => $freshPos !== null ? new PointOfSaleResource($freshPos) : null], 201);
     }
 
     public function show(PointOfSale $pointOfSale): JsonResponse
     {
-        return response()->json(['data' => $pointOfSale->load('organizationalUnit', 'cashRegisters')]);
+        return response()->json(['data' => new PointOfSaleResource($pointOfSale->load('organizationalUnit', 'cashRegisters'))]);
     }
 
-    public function update(Request $request, PointOfSale $pointOfSale): JsonResponse
+    public function update(UpdatePointOfSaleRequest $request, PointOfSale $pointOfSale): JsonResponse
     {
-        $data = $request->validate([
-            'name'   => 'sometimes|string|max:255',
-            'active' => 'sometimes|boolean',
-        ]);
+        $data = $request->validated();
 
         $pointOfSale->update($data);
 
-        return response()->json(['data' => $pointOfSale->fresh()]);
+        return response()->json(['data' => new PointOfSaleResource($pointOfSale->fresh() ?? $pointOfSale)]);
     }
 }

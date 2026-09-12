@@ -6,6 +6,10 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreCustomerRequest;
+use Modules\Commerce\Http\Requests\UpdateCustomerRequest;
+use Modules\Commerce\Http\Resources\CustomerResource;
+use Modules\Commerce\Http\Resources\SaleResource;
 use Modules\Commerce\Internal\Enums\SaleState;
 use Modules\Commerce\Internal\Models\Customer;
 use Modules\Commerce\Internal\Models\Sale;
@@ -26,10 +30,10 @@ final class CustomerController
 
         $customers = $query->orderBy('name')->get();
 
-        return response()->json(['data' => $customers->toArray()]);
+        return response()->json(['data' => CustomerResource::collection($customers)]);
     }
 
-    public function show(Customer $customer): JsonResponse
+    public function show(Request $request, Customer $customer): JsonResponse
     {
         $salesCount = Sale::query()
             ->where('client_id', $customer->id)
@@ -42,41 +46,32 @@ final class CustomerController
             ->sum('total_including_tax');
 
         return response()->json([
-            'data' => array_merge($customer->toArray(), [
+            'data' => array_merge((new CustomerResource($customer))->resolve($request), [
                 'total_spent' => $totalSpent,
                 'sales_count' => $salesCount,
             ]),
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreCustomerRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'         => ['required', 'string', 'max:255'],
-            'phone'        => ['sometimes', 'nullable', 'string', 'max:30'],
-            'credit_limit' => ['sometimes', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $customer = Customer::create(array_merge($validated, [
             'outstanding_balance' => 0,
             'active'              => true,
         ]));
 
-        return response()->json(['data' => $customer->toArray()], 201);
+        return response()->json(['data' => new CustomerResource($customer)], 201);
     }
 
-    public function update(Request $request, Customer $customer): JsonResponse
+    public function update(UpdateCustomerRequest $request, Customer $customer): JsonResponse
     {
-        $validated = $request->validate([
-            'name'         => ['sometimes', 'string', 'max:255'],
-            'phone'        => ['sometimes', 'nullable', 'string', 'max:30'],
-            'credit_limit' => ['sometimes', 'integer', 'min:0'],
-            'active'       => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $customer->update($validated);
 
-        return response()->json(['data' => $customer->fresh()?->toArray() ?? $customer->toArray()]);
+        return response()->json(['data' => new CustomerResource($customer->fresh() ?? $customer)]);
     }
 
     public function sales(Request $request, Customer $customer): JsonResponse
@@ -93,7 +88,7 @@ final class CustomerController
         $paginator = $query->paginate(20);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => SaleResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),

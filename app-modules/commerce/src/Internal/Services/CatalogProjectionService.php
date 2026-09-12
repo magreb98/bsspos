@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Commerce\Internal\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Modules\Commerce\Internal\Models\Product;
 use Modules\Commerce\Public\CatalogProjection;
@@ -34,6 +35,11 @@ final class CatalogProjectionService
                 'updated_at' => now(),
             ]
         );
+
+        // Invalidate the public catalog cache (PublicCatalogReader) so this
+        // write is visible immediately instead of waiting out the TTL.
+        Cache::forget('catalog.list');
+        Cache::forget("catalog.ref.{$product->reference}");
 
         return $projection;
     }

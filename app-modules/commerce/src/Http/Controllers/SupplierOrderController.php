@@ -6,6 +6,8 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreSupplierOrderRequest;
+use Modules\Commerce\Http\Resources\SupplierOrderResource;
 use Modules\Commerce\Internal\Enums\SupplierOrderStatus;
 use Modules\Commerce\Internal\Models\SupplierOrder;
 
@@ -19,18 +21,12 @@ final class SupplierOrderController
             $query->where('supplier_id', $request->input('supplier_id'));
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json(['data' => SupplierOrderResource::collection($query->get())]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreSupplierOrderRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'supplier_id'        => 'required|uuid',
-            'lines'              => 'required|array|min:1',
-            'lines.*.product_id' => 'required|uuid',
-            'lines.*.quantity'   => 'required|integer|min:1',
-            'lines.*.unit_cost'  => 'required|integer|min:0',
-        ]);
+        $data = $request->validated();
 
         $order = SupplierOrder::create([
             'supplier_id' => $data['supplier_id'],
@@ -46,11 +42,13 @@ final class SupplierOrderController
             ]);
         }
 
-        return response()->json(['data' => $order->fresh()?->load('lines', 'supplier')], 201);
+        $freshOrder = $order->fresh()?->load('lines', 'supplier');
+
+        return response()->json(['data' => $freshOrder !== null ? new SupplierOrderResource($freshOrder) : null], 201);
     }
 
     public function show(SupplierOrder $supplierOrder): JsonResponse
     {
-        return response()->json(['data' => $supplierOrder->load('supplier', 'lines.product', 'receptions')]);
+        return response()->json(['data' => new SupplierOrderResource($supplierOrder->load('supplier', 'lines.product', 'receptions'))]);
     }
 }

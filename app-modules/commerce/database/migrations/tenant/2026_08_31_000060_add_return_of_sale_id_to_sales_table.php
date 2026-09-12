@@ -10,7 +10,7 @@ return new class () extends Migration {
     public function up(): void
     {
         Schema::table('sales', function (Blueprint $table): void {
-            $table->uuid('return_of_sale_id')->nullable()->after('client_id');
+            $table->uuid('return_of_sale_id')->nullable();
             $table->foreign('return_of_sale_id')->references('id')->on('sales');
         });
     }

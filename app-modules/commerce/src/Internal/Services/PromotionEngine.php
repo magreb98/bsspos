@@ -10,6 +10,7 @@ use Modules\Commerce\Internal\Models\Coupon;
 use Modules\Commerce\Internal\Models\Promotion;
 use Modules\Commerce\Internal\Models\Sale;
 use Modules\Commerce\Internal\Models\SaleLine;
+use Modules\Commerce\Internal\Support\VatCalculator;
 
 final class PromotionEngine
 {
@@ -45,7 +46,7 @@ final class PromotionEngine
             $grossHt = $line->unit_price?->toInt() ?? 0;
             $grossHt = $grossHt * $line->quantity;
             $netHt   = $grossHt - $discount;
-            $vatBp   = (int) round((float) ((string) $line->vat_rate) * 100);
+            $vatBp   = VatCalculator::basisPoints((string) $line->vat_rate);
             $tax     = (int) round($netHt * $vatBp / 10000);
             $ttc     = $netHt + $tax;
 

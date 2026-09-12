@@ -11,7 +11,7 @@ use Modules\SecteurElectronique\Http\Controllers\SerialUnitController;
 use Modules\SecteurElectronique\Http\Controllers\ServiceTicketController;
 use Modules\SecteurElectronique\Http\Controllers\WarrantyController;
 
-Route::prefix('electronics')->name('electronics.')->middleware(AuthenticateMemberRequest::class)->group(function (): void {
+Route::prefix('electronics')->name('electronics.')->middleware([AuthenticateMemberRequest::class, 'throttle:api'])->group(function (): void {
 
     // ── DeviceSpec ───────────────────────────────────────────────────────────
     Route::middleware('permission:device-spec.list')->group(function (): void {

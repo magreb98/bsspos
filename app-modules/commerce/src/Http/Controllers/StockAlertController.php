@@ -6,6 +6,8 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\SetStockThresholdRequest;
+use Modules\Commerce\Http\Resources\StockLevelResource;
 use Modules\Commerce\Internal\Models\StockLevel;
 
 final class StockAlertController
@@ -27,16 +29,12 @@ final class StockAlertController
 
         $alerts = $query->orderBy('quantity')->get();
 
-        return response()->json(['data' => $alerts->toArray()]);
+        return response()->json(['data' => StockLevelResource::collection($alerts)]);
     }
 
-    public function setThreshold(Request $request): JsonResponse
+    public function setThreshold(SetStockThresholdRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'product_id'        => ['required', 'uuid'],
-            'point_of_sale_id'  => ['required', 'uuid'],
-            'minimum_quantity'  => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $level = StockLevel::firstOrCreate(
             [
@@ -48,6 +46,6 @@ final class StockAlertController
 
         $level->update(['minimum_quantity' => $validated['minimum_quantity']]);
 
-        return response()->json(['data' => $level->fresh()?->toArray() ?? $level->toArray()]);
+        return response()->json(['data' => new StockLevelResource($level->fresh() ?? $level)]);
     }
 }

@@ -6,6 +6,9 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreProductRequest;
+use Modules\Commerce\Http\Requests\UpdateProductRequest;
+use Modules\Commerce\Http\Resources\ProductResource;
 use Modules\Commerce\Internal\Models\Family;
 use Modules\Commerce\Internal\Models\Product;
 
@@ -37,27 +40,19 @@ final class ProductController
 
         $products = $query->orderBy('label')->get();
 
-        return response()->json(['data' => $products->toArray()]);
+        return response()->json(['data' => ProductResource::collection($products)]);
     }
 
     public function show(Product $product): JsonResponse
     {
         $product->load('images');
 
-        return response()->json(['data' => $product->toArray()]);
+        return response()->json(['data' => new ProductResource($product)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreProductRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'reference'     => ['required', 'string', 'max:100'],
-            'label'         => ['required', 'string', 'max:255'],
-            'family_id'     => ['required', 'uuid'],
-            'selling_price' => ['required', 'integer', 'min:0'],
-            'vat_rate'      => ['required', 'numeric', 'min:0', 'max:100'],
-            'granularity'   => ['required', 'string', 'in:quantity,variant,serial,batch,service'],
-            'attributes'    => ['sometimes', 'nullable', 'array'],
-        ]);
+        $validated = $request->validated();
 
         $family = Family::query()->whereKey($validated['family_id'])->first();
         if ($family === null) {
@@ -66,23 +61,15 @@ final class ProductController
 
         $product = Product::create(array_merge($validated, ['active' => true]));
 
-        return response()->json(['data' => $product->toArray()], 201);
+        return response()->json(['data' => new ProductResource($product)], 201);
     }
 
-    public function update(Request $request, Product $product): JsonResponse
+    public function update(UpdateProductRequest $request, Product $product): JsonResponse
     {
-        $validated = $request->validate([
-            'label'         => ['sometimes', 'string', 'max:255'],
-            'family_id'     => ['sometimes', 'uuid'],
-            'selling_price' => ['sometimes', 'integer', 'min:0'],
-            'vat_rate'      => ['sometimes', 'numeric', 'min:0', 'max:100'],
-            'granularity'   => ['sometimes', 'string', 'in:quantity,variant,serial,batch,service'],
-            'attributes'    => ['sometimes', 'nullable', 'array'],
-            'active'        => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $product->update($validated);
 
-        return response()->json(['data' => $product->fresh()?->toArray() ?? $product->toArray()]);
+        return response()->json(['data' => new ProductResource($product->fresh() ?? $product)]);
     }
 }

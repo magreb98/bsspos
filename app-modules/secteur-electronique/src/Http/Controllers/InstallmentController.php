@@ -6,6 +6,7 @@ namespace Modules\SecteurElectronique\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\SecteurElectronique\Http\Resources\InstallmentResource;
 use Modules\SecteurElectronique\Models\Installment;
 use Modules\SecteurElectronique\Services\PaymentScheduleService;
 
@@ -31,7 +32,7 @@ final class InstallmentController
         $paginator = $query->paginate(15);
 
         return response()->json([
-            'data' => array_map(fn (Installment $i) => $i->toArray(), $paginator->items()),
+            'data' => array_map(fn (Installment $i) => new InstallmentResource($i), $paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -43,7 +44,7 @@ final class InstallmentController
 
     public function show(Installment $installment): JsonResponse
     {
-        return response()->json(['data' => $installment->toArray()]);
+        return response()->json(['data' => new InstallmentResource($installment)]);
     }
 
     public function pay(Installment $installment): JsonResponse
@@ -58,6 +59,6 @@ final class InstallmentController
 
         $this->service->payInstallment($installment);
 
-        return response()->json(['data' => $installment->refresh()->toArray()]);
+        return response()->json(['data' => new InstallmentResource($installment->refresh())]);
     }
 }

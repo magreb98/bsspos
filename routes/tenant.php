@@ -31,7 +31,7 @@ Route::middleware(['web', InitialiseTenant::class])->group(function (): void {
     })->middleware(PreventAccessFromTenant::class);
 });
 
-Route::middleware(['web', InitialiseTenant::class, AuthenticateMcpRequest::class])
+Route::middleware(['web', InitialiseTenant::class, AuthenticateMcpRequest::class, 'throttle:api'])
     ->prefix('mcp')
     ->group(function (): void {
         Route::get('tools', [McpController::class, 'tools']);

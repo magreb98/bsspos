@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Modules\Commerce\Http\Requests\StoreCashClosingRequest;
+use Modules\Commerce\Http\Resources\CashClosingResource;
 use Modules\Commerce\Internal\Models\CashSession;
 use Modules\Commerce\Internal\Services\CashClosingService;
 
@@ -16,9 +17,9 @@ final class CashClosingController
     {
     }
 
-    public function store(Request $request, CashSession $cashSession): JsonResponse
+    public function store(StoreCashClosingRequest $request, CashSession $cashSession): JsonResponse
     {
-        $data = $request->validate(['declared_cash' => 'required|integer|min:0']);
+        $data = $request->validated();
 
         try {
             $closing = $this->service->close(
@@ -30,7 +31,7 @@ final class CashClosingController
             return response()->json(['code' => 'SESSION_NOT_OPEN', 'message' => $e->getMessage()], 409);
         }
 
-        return response()->json(['data' => $closing->load('cashSession')], 201);
+        return response()->json(['data' => new CashClosingResource($closing->load('cashSession'))], 201);
     }
 
     public function show(CashSession $cashSession): JsonResponse
@@ -41,6 +42,6 @@ final class CashClosingController
             return response()->json(['code' => 'NO_CLOSING', 'message' => 'Cette session n\'a pas encore été clôturée.'], 404);
         }
 
-        return response()->json(['data' => $closing]);
+        return response()->json(['data' => new CashClosingResource($closing)]);
     }
 }

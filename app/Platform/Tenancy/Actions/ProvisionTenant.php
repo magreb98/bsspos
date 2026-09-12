@@ -129,18 +129,51 @@ class ProvisionTenant
         // TODO: create the tenant's initial subscription (billing, plan assignment, etc.)
     }
 
+    /**
+     * Runs a single provisioning step under a row lock on the tenant, so that
+     * two concurrently-dispatched jobs for the same tenant (e.g. a duplicate
+     * dispatch racing a retry) cannot both read the same provisioning_step,
+     * both decide the step still needs to run, and both execute it.
+     *
+     * The lock is held for the whole read-check-execute-write cycle: we open
+     * the transaction ourselves (rather than via DB::transaction()) so that on
+     * failure we can COMMIT the `provisioning_error` write instead of losing it
+     * to an automatic rollback, while still holding the tenant row lock until
+     * the step is fully resolved (success or failure).
+     */
     private function executeStep(Tenant $tenant, int $step, \Closure $fn): void
     {
-        $tenant->provisioning_error = null;
-        $tenant->save();
+        $connection = $tenant->getConnection();
+
+        $connection->beginTransaction();
 
         try {
+            /** @var Tenant|null $locked */
+            $locked = $tenant->newQuery()->whereKey($tenant->getKey())->lockForUpdate()->first();
+
+            if ($locked !== null && $locked->provisioning_step >= $step) {
+                // Another process already completed this step while we were
+                // waiting for the lock (or before we got here) — skip it.
+                $connection->commit();
+
+                return;
+            }
+
+            $tenant->provisioning_error = null;
+            $tenant->save();
+
             $fn();
+
             $tenant->provisioning_step = $step;
             $tenant->save();
+
+            $connection->commit();
         } catch (\Throwable $e) {
             $tenant->provisioning_error = $e->getMessage();
             $tenant->save();
+
+            $connection->commit();
+
             throw $e;
         }
     }

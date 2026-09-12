@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Modules\Commerce\Http\Data\StoreProductImageData;
+use Modules\Commerce\Http\Requests\ReorderProductImagesRequest;
+use Modules\Commerce\Http\Requests\StoreProductImageRequest;
+use Modules\Commerce\Http\Requests\UploadProductImageRequest;
+use Modules\Commerce\Http\Resources\ProductImageResource;
 use Modules\Commerce\Internal\Models\Product;
 use Modules\Commerce\Internal\Models\ProductImage;
 
@@ -16,36 +18,26 @@ final class ProductImageController
     public function index(Product $product): JsonResponse
     {
         return response()->json([
-            'data' => $product->images()->get()->toArray(),
+            'data' => ProductImageResource::collection($product->images()->get()),
         ]);
     }
 
-    public function store(Request $request, Product $product): JsonResponse
+    public function store(StoreProductImageRequest $request, Product $product): JsonResponse
     {
-        $validated = $request->validate([
-            'url'      => ['required', 'string', 'max:2048'],
-            'position' => ['sometimes', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $position = $validated['position'] ?? (int) (($product->images()->max('position') ?? -1) + 1);
-
-        $_ = StoreProductImageData::from($validated);
 
         $image = $product->images()->create([
             'url'      => $validated['url'],
             'position' => $position,
         ]);
 
-        return response()->json(['data' => $image->toArray()], 201);
+        return response()->json(['data' => new ProductImageResource($image)], 201);
     }
 
-    public function upload(Request $request, Product $product): JsonResponse
+    public function upload(UploadProductImageRequest $request, Product $product): JsonResponse
     {
-        $request->validate([
-            'image'    => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'position' => ['sometimes', 'integer', 'min:0'],
-        ]);
-
         /** @var UploadedFile $file */
         $file = $request->file('image');
         $path = $file->store("products/{$product->id}", 'public');
@@ -67,7 +59,7 @@ final class ProductImageController
             'position' => $position,
         ]);
 
-        return response()->json(['data' => $image->toArray()], 201);
+        return response()->json(['data' => new ProductImageResource($image)], 201);
     }
 
     public function destroy(Product $product, ProductImage $image): JsonResponse
@@ -85,12 +77,9 @@ final class ProductImageController
         return response()->json(null, 204);
     }
 
-    public function reorder(Request $request, Product $product): JsonResponse
+    public function reorder(ReorderProductImagesRequest $request, Product $product): JsonResponse
     {
-        $validated = $request->validate([
-            'order'   => ['required', 'array', 'min:1'],
-            'order.*' => ['required', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $ids = $validated['order'];
         $images = $product->images()->whereIn('id', $ids)->get()->keyBy('id');
@@ -111,7 +100,7 @@ final class ProductImageController
         }
 
         return response()->json([
-            'data' => $product->images()->get()->toArray(),
+            'data' => ProductImageResource::collection($product->images()->get()),
         ]);
     }
 }

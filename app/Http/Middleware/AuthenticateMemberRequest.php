@@ -32,8 +32,25 @@ final class AuthenticateMemberRequest
             return response()->json(['code' => 'UNAUTHENTICATED', 'message' => 'Token invalide.'], 401);
         }
 
+        if ($memberToken->isExpired()) {
+            $memberToken->delete();
+
+            return response()->json(['code' => 'TOKEN_EXPIRED', 'message' => 'Token expiré.'], 401);
+        }
+
         if (! $memberToken->member->isActive()) {
             return response()->json(['code' => 'ACCOUNT_INACTIVE', 'message' => 'Ce compte est désactivé.'], 403);
+        }
+
+        // A member whose password was never rotated off its initial
+        // (phone-number-derived) value must change it before doing anything
+        // else — except calling the change-password endpoint itself, or the
+        // account could never get unstuck.
+        if ($memberToken->member->must_change_password && ! $request->routeIs('commerce.auth.change-password')) {
+            return response()->json([
+                'code'    => 'MUST_CHANGE_PASSWORD',
+                'message' => 'Vous devez changer votre mot de passe avant de continuer.',
+            ], 403);
         }
 
         $memberToken->update(['last_used_at' => now()]);

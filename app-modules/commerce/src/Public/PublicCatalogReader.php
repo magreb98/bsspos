@@ -13,12 +13,12 @@ final class PublicCatalogReader
     public function list(): Collection
     {
         /** @var Collection<int, CatalogProjection> */
-        return Cache::remember('catalog.list', 30, fn () => CatalogProjection::all());
+        return Cache::remember('catalog.list', now()->addMinutes(30), fn () => CatalogProjection::all());
     }
 
     public function find(string $reference): ?CatalogProjection
     {
         /** @var CatalogProjection|null */
-        return Cache::remember("catalog.ref.{$reference}", 30, fn () => CatalogProjection::where('reference', $reference)->first());
+        return Cache::remember("catalog.ref.{$reference}", now()->addMinutes(30), fn () => CatalogProjection::where('reference', $reference)->first());
     }
 }

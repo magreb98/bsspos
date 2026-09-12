@@ -18,7 +18,14 @@ final class CheckIdempotence
         $row = DB::table('idempotency_keys')->where('key', $key)->first();
 
         if ($row === null) {
-            DB::table('idempotency_keys')->insert([
+            // `key` is the table's primary key: two near-simultaneous requests
+            // with the same key could both see "absent" here. insertOrIgnore()
+            // silently no-ops on the PK conflict instead of throwing, so the
+            // loser doesn't blow up with an unhandled QueryException. We then
+            // re-select unconditionally and, if our own insert didn't land
+            // (another request won the race), fall through to the normal
+            // existing-row handling below instead of assuming we created it.
+            $inserted = DB::table('idempotency_keys')->insertOrIgnore([
                 'key'                 => $key,
                 'request_fingerprint' => $fingerprint,
                 'response'            => null,
@@ -26,7 +33,11 @@ final class CheckIdempotence
                 'expires_at'          => now()->addDays(30),
             ]);
 
-            return new IdempotenceResult(true, null, null);
+            $row = DB::table('idempotency_keys')->where('key', $key)->first();
+
+            if ($inserted > 0) {
+                return new IdempotenceResult(true, null, null);
+            }
         }
 
         if (now()->isAfter($row->expires_at)) {

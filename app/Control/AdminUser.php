@@ -28,6 +28,7 @@ final class AdminUser extends Model
         'password',
         'active',
         'last_connected_at',
+        'is_super_admin',
     ];
 
     /** @var array<string, string> */
@@ -35,11 +36,17 @@ final class AdminUser extends Model
         'active'             => 'boolean',
         'last_connected_at'  => 'datetime',
         'password'           => 'hashed',
+        'is_super_admin'     => 'boolean',
     ];
 
     public function isActive(): bool
     {
         return (bool) $this->active;
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_super_admin;
     }
 
     public function checkPassword(string $plaintext): bool

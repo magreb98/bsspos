@@ -24,16 +24,23 @@ final class AdminToken extends Model
         'name',
         'token',
         'last_used_at',
+        'expires_at',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'last_used_at' => 'datetime',
+        'expires_at'   => 'datetime',
     ];
 
     /** @return BelongsTo<AdminUser, $this> */
     public function adminUser(): BelongsTo
     {
         return $this->belongsTo(AdminUser::class, 'admin_user_id');
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->isPast();
     }
 }

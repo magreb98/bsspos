@@ -43,9 +43,14 @@ return [
 
         'database' => [
             'driver' => 'database',
-            'connection' => env('DB_CACHE_CONNECTION'),
+            // Must always resolve to the CENTRAL connection: the `cache` /
+            // `cache_locks` tables only exist there, never in a tenant database.
+            // Falling back to null would resolve against whatever connection is
+            // currently the app default, which is `tenant` during tenant requests
+            // (see App\Platform\Tenancy\Bootstrappers\SwitchTenantConnection).
+            'connection' => env('DB_CACHE_CONNECTION', env('DB_CONNECTION', 'sqlite')),
             'table' => env('DB_CACHE_TABLE', 'cache'),
-            'lock_connection' => env('DB_CACHE_LOCK_CONNECTION'),
+            'lock_connection' => env('DB_CACHE_LOCK_CONNECTION', env('DB_CONNECTION', 'sqlite')),
             'lock_table' => env('DB_CACHE_LOCK_TABLE'),
         ],
 

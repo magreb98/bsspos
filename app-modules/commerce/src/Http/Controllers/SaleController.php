@@ -9,6 +9,12 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Commerce\Http\Requests\AddSaleLineRequest;
+use Modules\Commerce\Http\Requests\ConfirmSaleRequest;
+use Modules\Commerce\Http\Requests\StoreSaleRequest;
+use Modules\Commerce\Http\Resources\SaleReceiptResource;
+use Modules\Commerce\Http\Resources\SaleLineResource;
+use Modules\Commerce\Http\Resources\SaleResource;
 use Modules\Commerce\Internal\Enums\SaleState;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Symfony\Component\HttpFoundation\Response;
@@ -20,13 +26,16 @@ use Modules\Commerce\Internal\Models\Product;
 use Modules\Commerce\Internal\Models\Sale;
 use Modules\Commerce\Internal\Models\SaleLine;
 use Modules\Commerce\Internal\Services\PromotionEngine;
+use Modules\Commerce\Internal\Services\SaleAccessGuard;
 use Modules\Commerce\Internal\Services\SaleConfirmationService;
+use Modules\Commerce\Internal\Support\VatCalculator;
 
 final class SaleController
 {
     public function __construct(
         private readonly SaleConfirmationService $service,
         private readonly PromotionEngine $promotionEngine,
+        private readonly SaleAccessGuard $accessGuard,
     ) {
     }
 
@@ -68,7 +77,7 @@ final class SaleController
         $paginator = $query->paginate(20);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => SaleResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -78,13 +87,9 @@ final class SaleController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreSaleRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'cash_session_id' => ['required', 'uuid'],
-            'client_id'       => ['sometimes', 'nullable', 'uuid'],
-            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         $session = CashSession::query()->whereKey($validated['cash_session_id'])->first();
         if ($session === null) {
@@ -98,7 +103,7 @@ final class SaleController
         if (isset($validated['idempotency_key'])) {
             $existing = Sale::query()->where('idempotency_key', $validated['idempotency_key'])->first();
             if ($existing !== null) {
-                return response()->json(['data' => $existing->load('lines')->toArray()]);
+                return response()->json(['data' => new SaleResource($existing->load('lines'))]);
             }
         }
 
@@ -109,77 +114,46 @@ final class SaleController
             'state'           => SaleState::Draft,
         ]);
 
-        return response()->json(['data' => $sale->toArray()], 201);
+        return response()->json(['data' => new SaleResource($sale)], 201);
     }
 
     public function show(Sale $sale): JsonResponse
     {
-        return response()->json(['data' => $sale->load('lines', 'customer')->toArray()]);
+        $this->accessGuard->ensureAccessible($sale);
+
+        return response()->json(['data' => new SaleResource($sale->load('lines', 'customer'))]);
     }
 
     public function cancel(Sale $sale): JsonResponse
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         if ($sale->state !== SaleState::Draft) {
             return response()->json(['code' => 'SALE_NOT_DRAFT', 'message' => 'Seule une vente en brouillon peut être annulée.', 'champ' => null], 409);
         }
 
         $sale->update(['state' => SaleState::Abandoned]);
 
-        return response()->json(['data' => $sale->fresh()?->toArray() ?? $sale->toArray()]);
+        return response()->json(['data' => new SaleResource($sale->fresh() ?? $sale)]);
     }
 
     public function receipt(Sale $sale): JsonResponse
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         $sale->load('lines.product', 'customer', 'payments');
 
         $setting = InvoiceSetting::first();
 
-        $lines = $sale->lines->map(static fn (SaleLine $l): array => [
-            'designation'              => $l->designation,
-            'quantity'                 => $l->quantity,
-            'unit_price'               => $l->unit_price?->toInt() ?? 0,
-            'vat_rate'                 => (string) $l->vat_rate,
-            'line_total_excluding_tax' => $l->line_total_excluding_tax?->toInt() ?? 0,
-            'line_total_tax'           => $l->line_total_tax?->toInt() ?? 0,
-            'line_total_including_tax' => $l->line_total_including_tax?->toInt() ?? 0,
-            'discount_amount'          => $l->discount_amount?->toInt() ?? 0,
-        ]);
-
-        $payments = $sale->payments->map(static fn ($p): array => [
-            'method'       => $p->method instanceof \BackedEnum ? $p->method->value : $p->method,
-            'amount'       => $p->amount?->toInt() ?? 0,
-            'status'       => $p->status->value,
-            'reference'    => $p->reference,
-            'confirmed_at' => $p->confirmed_at?->toIso8601String(),
-        ]);
-
         return response()->json([
-            'data' => [
-                'company' => $setting !== null ? [
-                    'name'         => $setting->company_name,
-                    'niu'          => $setting->niu,
-                    'rccm'         => $setting->rccm,
-                    'address'      => $setting->address,
-                    'phone'        => $setting->phone,
-                ] : null,
-                'sale' => [
-                    'id'                  => $sale->id,
-                    'number'              => $sale->number,
-                    'state'               => $sale->state->value,
-                    'confirmed_at'        => $sale->confirmed_at?->toIso8601String(),
-                    'total_excluding_tax' => $sale->total_excluding_tax?->toInt() ?? 0,
-                    'total_tax'           => $sale->total_tax?->toInt() ?? 0,
-                    'total_including_tax' => $sale->total_including_tax?->toInt() ?? 0,
-                ],
-                'customer' => $sale->customer?->toArray(),
-                'lines'    => $lines->all(),
-                'payments' => $payments->all(),
-            ],
+            'data' => new SaleReceiptResource($sale, $setting),
         ]);
     }
 
     public function receiptPdf(Sale $sale): Response
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         $sale->load('lines.product', 'customer', 'payments');
         $setting = InvoiceSetting::first();
 
@@ -189,17 +163,15 @@ final class SaleController
             ->download();
     }
 
-    public function confirm(Request $request, Sale $sale): JsonResponse
+    public function confirm(ConfirmSaleRequest $request, Sale $sale): JsonResponse
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         if ($sale->state !== SaleState::Draft) {
             return response()->json(['code' => 'SALE_NOT_DRAFT', 'message' => 'Seule une vente en brouillon peut être confirmée.', 'champ' => null], 409);
         }
 
-        $validated = $request->validate([
-            'coupon_code'          => ['sometimes', 'nullable', 'string'],
-            'loyalty_points_used'  => ['sometimes', 'integer', 'min:0'],
-            'customer_credit_id'   => ['sometimes', 'nullable', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $couponCode          = $validated['coupon_code'] ?? null;
         $loyaltyPointsUsed   = (int) ($validated['loyalty_points_used'] ?? 0);
@@ -246,23 +218,20 @@ final class SaleController
             return response()->json(['code' => 'COUPON_ERROR', 'message' => $e->getMessage(), 'champ' => 'coupon_code'], 422);
         }
 
-        return response()->json(['data' => $sale->fresh()?->load('lines')->toArray() ?? []]);
+        $freshSale = $sale->fresh();
+
+        return response()->json(['data' => $freshSale !== null ? new SaleResource($freshSale->load('lines')) : []]);
     }
 
-    public function addLine(Request $request, Sale $sale): JsonResponse
+    public function addLine(AddSaleLineRequest $request, Sale $sale): JsonResponse
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         if ($sale->state !== SaleState::Draft) {
             return response()->json(['code' => 'SALE_NOT_DRAFT', 'message' => 'Impossible d\'ajouter une ligne à une vente confirmée.', 'champ' => null], 409);
         }
 
-        $validated = $request->validate([
-            'product_id'      => ['required', 'uuid'],
-            'quantity'        => ['required', 'integer', 'min:1'],
-            'unit_price'      => ['sometimes', 'integer', 'min:0'],
-            'designation'     => ['sometimes', 'nullable', 'string', 'max:255'],
-            'discount_percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
-            'discount_amount'  => ['sometimes', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['discount_percent']) && isset($validated['discount_amount'])) {
             return response()->json(['code' => 'DISCOUNT_CONFLICT', 'message' => 'Spécifiez discount_percent ou discount_amount, pas les deux.', 'champ' => 'discount_percent'], 422);
@@ -286,8 +255,7 @@ final class SaleController
             $discountAmount = min((int) $validated['discount_amount'], $baseTotal);
         }
 
-        $vatRateStr = (string) $product->vat_rate;
-        $vatBp      = (int) round((float) $vatRateStr * 100);
+        $vatBp      = VatCalculator::basisPoints((string) $product->vat_rate);
         $ht         = $baseTotal - $discountAmount;
         $tax        = (int) round($ht * $vatBp / 10000);
         $ttc        = $ht + $tax;
@@ -306,11 +274,13 @@ final class SaleController
             'allocations'              => [],
         ]);
 
-        return response()->json(['data' => $line->toArray()], 201);
+        return response()->json(['data' => new SaleLineResource($line)], 201);
     }
 
     public function removeLine(Sale $sale, SaleLine $line): JsonResponse
     {
+        $this->accessGuard->ensureAccessible($sale);
+
         if ($sale->state !== SaleState::Draft) {
             return response()->json(['code' => 'SALE_NOT_DRAFT', 'message' => 'Impossible de supprimer une ligne d\'une vente confirmée.', 'champ' => null], 409);
         }

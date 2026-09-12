@@ -40,12 +40,14 @@ final class User extends Authenticatable implements AuditableContract
         'password',
         'active',
         'last_connected_at',
+        'must_change_password',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'active' => 'boolean',
         'last_connected_at' => 'datetime',
+        'must_change_password' => 'boolean',
     ];
 
     /** @return BelongsToMany<Perimeter, $this> */

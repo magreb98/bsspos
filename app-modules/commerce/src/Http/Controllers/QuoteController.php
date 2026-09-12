@@ -8,6 +8,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Modules\Commerce\Http\Requests\ConvertQuoteRequest;
+use Modules\Commerce\Http\Requests\StoreQuoteRequest;
+use Modules\Commerce\Http\Resources\SaleResource;
 use Modules\Commerce\Internal\Enums\SaleState;
 use Modules\Commerce\Internal\Enums\SessionState;
 use Modules\Commerce\Internal\Models\CashSession;
@@ -30,7 +33,7 @@ final class QuoteController
         $paginator = $query->paginate(20);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => SaleResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -40,18 +43,14 @@ final class QuoteController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreQuoteRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'client_id'       => ['sometimes', 'nullable', 'uuid', 'exists:customers,id'],
-            'valid_until'     => ['sometimes', 'nullable', 'date_format:Y-m-d'],
-            'idempotency_key' => ['sometimes', 'nullable', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['idempotency_key'])) {
             $existing = Sale::query()->where('idempotency_key', $validated['idempotency_key'])->first();
             if ($existing !== null) {
-                return response()->json(['data' => $existing->load('customer')->toArray()]);
+                return response()->json(['data' => new SaleResource($existing->load('customer'))]);
             }
         }
 
@@ -63,10 +62,10 @@ final class QuoteController
             'state'           => SaleState::Quote,
         ]);
 
-        return response()->json(['data' => $quote->load('customer')->toArray()], 201);
+        return response()->json(['data' => new SaleResource($quote->load('customer'))], 201);
     }
 
-    public function convert(Request $request, Sale $sale): JsonResponse
+    public function convert(ConvertQuoteRequest $request, Sale $sale): JsonResponse
     {
         if ($sale->state !== SaleState::Quote) {
             return response()->json([
@@ -76,9 +75,7 @@ final class QuoteController
             ], 409);
         }
 
-        $validated = $request->validate([
-            'cash_session_id' => ['sometimes', 'nullable', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         // Si cash_session_id non fourni, chercher la session active de l'utilisateur courant
         $sessionId = $validated['cash_session_id'] ?? null;
@@ -120,6 +117,8 @@ final class QuoteController
             'state'           => SaleState::Draft,
         ]);
 
-        return response()->json(['data' => $sale->fresh()?->load(['lines', 'customer'])->toArray() ?? []]);
+        $freshSale = $sale->fresh();
+
+        return response()->json(['data' => $freshSale !== null ? new SaleResource($freshSale->load(['lines', 'customer'])) : []]);
     }
 }

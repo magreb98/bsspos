@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreFamilyRequest;
+use Modules\Commerce\Http\Requests\UpdateFamilyRequest;
+use Modules\Commerce\Http\Resources\FamilyResource;
 use Modules\Commerce\Internal\Models\Family;
 
 final class FamilyController
@@ -14,20 +16,17 @@ final class FamilyController
     {
         $families = Family::query()->orderBy('name')->get();
 
-        return response()->json(['data' => $families->toArray()]);
+        return response()->json(['data' => FamilyResource::collection($families)]);
     }
 
     public function show(Family $family): JsonResponse
     {
-        return response()->json(['data' => $family->toArray()]);
+        return response()->json(['data' => new FamilyResource($family)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreFamilyRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'      => ['required', 'string', 'max:150'],
-            'parent_id' => ['sometimes', 'nullable', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['parent_id'])) {
             $parent = Family::query()->whereKey($validated['parent_id'])->first();
@@ -38,19 +37,15 @@ final class FamilyController
 
         $family = Family::create(array_merge($validated, ['active' => true]));
 
-        return response()->json(['data' => $family->toArray()], 201);
+        return response()->json(['data' => new FamilyResource($family)], 201);
     }
 
-    public function update(Request $request, Family $family): JsonResponse
+    public function update(UpdateFamilyRequest $request, Family $family): JsonResponse
     {
-        $validated = $request->validate([
-            'name'      => ['sometimes', 'string', 'max:150'],
-            'parent_id' => ['sometimes', 'nullable', 'uuid'],
-            'active'    => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $family->update($validated);
 
-        return response()->json(['data' => $family->fresh()?->toArray() ?? $family->toArray()]);
+        return response()->json(['data' => new FamilyResource($family->fresh() ?? $family)]);
     }
 }

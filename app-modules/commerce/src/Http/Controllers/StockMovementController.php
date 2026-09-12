@@ -6,6 +6,7 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Resources\StockMovementReportResource;
 use Modules\Commerce\Internal\Models\StockMovement;
 
 final class StockMovementController
@@ -43,19 +44,8 @@ final class StockMovementController
 
         $paginator = $query->paginate(50);
 
-        $data = array_map(static function (StockMovement $m): array {
-            return [
-                'id'         => $m->id,
-                'product'    => $m->product?->label ?? $m->product_id,
-                'type'       => $m->quantity >= 0 ? 'entree' : 'sortie',
-                'qty'        => $m->quantity,
-                'reason'     => $m->sale_line_id !== null ? 'Vente' : 'Ajustement',
-                'created_at' => $m->occurred_at?->toIso8601String() ?? $m->created_at?->toIso8601String(),
-            ];
-        }, $paginator->items());
-
         return response()->json([
-            'data' => $data,
+            'data' => StockMovementReportResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),

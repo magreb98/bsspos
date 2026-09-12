@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreOrganizationalUnitRequest;
+use Modules\Commerce\Http\Requests\UpdateOrganizationalUnitRequest;
+use Modules\Commerce\Http\Resources\OrganizationalUnitResource;
 use Modules\Commerce\Internal\Models\OrganizationalUnit;
 
 final class OrganizationalUnitController
@@ -18,15 +20,12 @@ final class OrganizationalUnitController
             ->orderBy('name')
             ->get();
 
-        return response()->json(['data' => $units]);
+        return response()->json(['data' => OrganizationalUnitResource::collection($units)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreOrganizationalUnitRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'      => ['required', 'string', 'max:255'],
-            'parent_id' => ['sometimes', 'nullable', 'uuid', 'exists:organizational_units,id'],
-        ]);
+        $validated = $request->validated();
 
         $unit = OrganizationalUnit::create([
             'name'      => $validated['name'],
@@ -34,26 +33,23 @@ final class OrganizationalUnitController
             'active'    => true,
         ]);
 
-        return response()->json(['data' => $unit->fresh()], 201);
+        return response()->json(['data' => new OrganizationalUnitResource($unit->fresh() ?? $unit)], 201);
     }
 
     public function show(OrganizationalUnit $organizationalUnit): JsonResponse
     {
         return response()->json([
-            'data' => $organizationalUnit->load('children', 'pointsOfSale.cashRegisters'),
+            'data' => new OrganizationalUnitResource($organizationalUnit->load('children', 'pointsOfSale.cashRegisters')),
         ]);
     }
 
-    public function update(Request $request, OrganizationalUnit $organizationalUnit): JsonResponse
+    public function update(UpdateOrganizationalUnitRequest $request, OrganizationalUnit $organizationalUnit): JsonResponse
     {
-        $validated = $request->validate([
-            'name'   => ['sometimes', 'string', 'max:255'],
-            'active' => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $organizationalUnit->update($validated);
 
-        return response()->json(['data' => $organizationalUnit->fresh()]);
+        return response()->json(['data' => new OrganizationalUnitResource($organizationalUnit->fresh() ?? $organizationalUnit)]);
     }
 
     public function destroy(OrganizationalUnit $organizationalUnit): JsonResponse

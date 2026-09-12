@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Commerce\Http\Requests\StoreSaleReturnRequest;
+use Modules\Commerce\Http\Resources\SaleResource;
 use Modules\Commerce\Internal\Enums\Granularity;
 use Modules\Commerce\Internal\Enums\SaleState;
 use Modules\Commerce\Internal\Models\CustomerCredit;
@@ -17,7 +18,7 @@ use Modules\Commerce\Internal\Models\StockMovement;
 
 final class SaleReturnController
 {
-    public function store(Request $request, Sale $sale): JsonResponse
+    public function store(StoreSaleReturnRequest $request, Sale $sale): JsonResponse
     {
         if (! $sale->isConfirmed()) {
             return response()->json(['code' => 'SALE_NOT_CONFIRMED', 'message' => 'Seule une vente confirmée peut faire l\'objet d\'un retour.', 'champ' => null], 409);
@@ -27,11 +28,7 @@ final class SaleReturnController
             return response()->json(['code' => 'RETURN_ALREADY_EXISTS', 'message' => 'Un retour existe déjà pour cette vente.', 'champ' => null], 409);
         }
 
-        $validated = $request->validate([
-            'lines'                   => ['sometimes', 'array'],
-            'lines.*.sale_line_id'    => ['required_with:lines', 'uuid'],
-            'lines.*.quantity'        => ['required_with:lines', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $originalLines = $sale->lines()->with('product')->get()->keyBy('id');
 
@@ -139,6 +136,8 @@ final class SaleReturnController
             return $ret;
         });
 
-        return response()->json(['data' => $returnSale->fresh()?->load('lines')->toArray()], 201);
+        $freshReturnSale = $returnSale->fresh();
+
+        return response()->json(['data' => $freshReturnSale !== null ? new SaleResource($freshReturnSale->load('lines')) : null], 201);
     }
 }

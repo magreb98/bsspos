@@ -31,6 +31,12 @@ final class AuthenticateAdminRequest
             return response()->json(['code' => 'UNAUTHENTICATED', 'message' => 'Token invalide.'], 401);
         }
 
+        if ($adminToken->isExpired()) {
+            $adminToken->delete();
+
+            return response()->json(['code' => 'TOKEN_EXPIRED', 'message' => 'Token expiré.'], 401);
+        }
+
         if (! $adminToken->adminUser->isActive()) {
             return response()->json(['code' => 'ACCOUNT_INACTIVE', 'message' => 'Ce compte est désactivé.'], 403);
         }

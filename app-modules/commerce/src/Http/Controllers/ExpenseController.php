@@ -6,6 +6,8 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreExpenseRequest;
+use Modules\Commerce\Http\Resources\ExpenseResource;
 use Modules\Commerce\Internal\Models\CashSession;
 use Modules\Commerce\Internal\Models\Expense;
 
@@ -19,16 +21,12 @@ final class ExpenseController
             $query->where('cash_session_id', $request->input('cash_session_id'));
         }
 
-        return response()->json(['data' => $query->get()]);
+        return response()->json(['data' => ExpenseResource::collection($query->get())]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreExpenseRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'cash_session_id' => 'required|uuid',
-            'amount'          => 'required|integer|min:1',
-            'label'           => 'required|string|max:255',
-        ]);
+        $data = $request->validated();
 
         $session = CashSession::where('id', $data['cash_session_id'])->firstOrFail();
 
@@ -43,6 +41,6 @@ final class ExpenseController
             'recorded_at'     => now(),
         ]);
 
-        return response()->json(['data' => $expense], 201);
+        return response()->json(['data' => new ExpenseResource($expense)], 201);
     }
 }

@@ -6,12 +6,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Control\Domaine;
 use App\Control\Tenant;
+use App\Http\Requests\Admin\StoreDomainRequest;
+use App\Http\Resources\Admin\DomainResource;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 final class DomainController
 {
-    public function store(Request $request, string $tenantId): JsonResponse
+    public function store(StoreDomainRequest $request, string $tenantId): JsonResponse
     {
         $tenant = Tenant::find($tenantId);
 
@@ -19,9 +20,7 @@ final class DomainController
             return response()->json(['code' => 'NOT_FOUND', 'message' => 'Entreprise introuvable.'], 404);
         }
 
-        $validated = $request->validate([
-            'domain' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         if (Domaine::where('domain', $validated['domain'])->exists()) {
             return response()->json([
@@ -33,7 +32,7 @@ final class DomainController
 
         $domain = $tenant->domains()->create(['domain' => $validated['domain']]);
 
-        return response()->json(['data' => $domain->toArray()], 201);
+        return response()->json(['data' => new DomainResource($domain)], 201);
     }
 
     public function destroy(string $tenantId, string $domainId): JsonResponse

@@ -16,6 +16,12 @@ use Ramsey\Uuid\Uuid;
 
 final class SaleConfirmationService
 {
+    public function __construct(
+        private readonly AllocateNumber $allocateNumber = new AllocateNumber(),
+        private readonly PublishMessage $publishMessage = new PublishMessage(),
+    ) {
+    }
+
     public function confirm(Sale $sale): void
     {
         if ($sale->isConfirmed()) {
@@ -37,12 +43,11 @@ final class SaleConfirmationService
         $totalTtc = $lines->sum(fn ($l) => $l->line_total_including_tax?->toInt() ?? 0);
 
         // Must be called from within the caller's DB::transaction().
-        $allocator = new AllocateNumber();
-        $posUuid   = Uuid::fromString($pos->id);
-        $year      = now()->year;
+        $posUuid = Uuid::fromString($pos->id);
+        $year    = now()->year;
 
-        $allocator->initializeIfAbsent($posUuid, 'sale', $year);
-        $sequence = $allocator->allocate($posUuid, 'sale', $year);
+        $this->allocateNumber->initializeIfAbsent($posUuid, 'sale', $year);
+        $sequence = $this->allocateNumber->allocate($posUuid, 'sale', $year);
         $number   = sprintf('V-%d-%04d', $year, $sequence);
 
         $sale->update([
@@ -99,7 +104,7 @@ final class SaleConfirmationService
             }
         }
 
-        (new PublishMessage())->publish('commerce.sale.confirmed', [
+        $this->publishMessage->publish('commerce.sale.confirmed', [
             'sale_id'             => $sale->id,
             'number'              => $number,
             'total_including_tax' => $totalTtc,

@@ -5,19 +5,18 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Modules\Commerce\Http\Requests\CustomerRankingReportRequest;
+use Modules\Commerce\Http\Requests\MarginReportRequest;
+use Modules\Commerce\Http\Requests\StockRotationReportRequest;
+use Modules\Commerce\Http\Requests\TopProductsReportRequest;
 use Modules\Commerce\Internal\Enums\SaleState;
 
 final class ReportController
 {
-    public function topProducts(Request $request): JsonResponse
+    public function topProducts(TopProductsReportRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from'  => ['sometimes', 'date'],
-            'to'    => ['sometimes', 'date'],
-            'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         $limit = $validated['limit'] ?? 10;
 
@@ -48,13 +47,9 @@ final class ReportController
         return response()->json(['data' => $query->get()->toArray()]);
     }
 
-    public function margin(Request $request): JsonResponse
+    public function margin(MarginReportRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from'      => ['sometimes', 'date'],
-            'to'        => ['sometimes', 'date'],
-            'family_id' => ['sometimes', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $query = DB::table('sale_lines')
             ->join('sales', 'sales.id', '=', 'sale_lines.sale_id')
@@ -83,13 +78,9 @@ final class ReportController
         return response()->json(['data' => $query->first()]);
     }
 
-    public function customerRanking(Request $request): JsonResponse
+    public function customerRanking(CustomerRankingReportRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from'  => ['sometimes', 'date'],
-            'to'    => ['sometimes', 'date'],
-            'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         $limit = $validated['limit'] ?? 10;
 
@@ -120,13 +111,9 @@ final class ReportController
         return response()->json(['data' => $query->get()->toArray()]);
     }
 
-    public function stockRotation(Request $request): JsonResponse
+    public function stockRotation(StockRotationReportRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'from'             => ['sometimes', 'date'],
-            'to'               => ['sometimes', 'date'],
-            'point_of_sale_id' => ['sometimes', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $query = DB::table('stock_movements')
             ->join('products', 'products.id', '=', 'stock_movements.product_id')

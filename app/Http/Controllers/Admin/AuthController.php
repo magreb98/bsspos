@@ -6,18 +6,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Control\AdminToken;
 use App\Control\AdminUser;
+use App\Http\Requests\Admin\LoginRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 final class AuthController
 {
-    public function login(Request $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'email'    => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $admin = AdminUser::where('email', $validated['email'])->first();
 
@@ -41,6 +39,7 @@ final class AuthController
             'admin_user_id' => $admin->id,
             'name'          => 'Web Login',
             'token'         => hash('sha256', $rawToken),
+            'expires_at'    => now()->addDays(30),
         ]);
 
         $admin->update(['last_connected_at' => now()]);

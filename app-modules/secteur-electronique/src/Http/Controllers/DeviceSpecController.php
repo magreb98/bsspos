@@ -10,8 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Modules\Commerce\Internal\Models\Product;
 use Modules\SecteurElectronique\Enums\DeviceCategory;
-use Modules\SecteurElectronique\Http\Data\StoreDeviceSpecData;
-use Modules\SecteurElectronique\Http\Data\UpdateDeviceSpecData;
+use Modules\SecteurElectronique\Http\Requests\StoreDeviceSpecRequest;
+use Modules\SecteurElectronique\Http\Requests\UpdateDeviceSpecRequest;
+use Modules\SecteurElectronique\Http\Resources\DeviceSpecResource;
 use Modules\SecteurElectronique\Models\DeviceSpec;
 use Modules\SecteurElectronique\Services\DeviceSpecService;
 
@@ -33,7 +34,7 @@ final class DeviceSpecController
         $paginator = $query->paginate(15);
 
         return response()->json([
-            'data' => array_map(fn (DeviceSpec $spec) => $spec->toArray(), $paginator->items()),
+            'data' => array_map(fn (DeviceSpec $spec) => new DeviceSpecResource($spec), $paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -43,34 +44,9 @@ final class DeviceSpecController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreDeviceSpecRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'product_id'         => ['required', 'uuid'],
-            'category'           => ['required', 'string'],
-            'brand'              => ['required', 'string', 'max:100'],
-            'model'              => ['required', 'string', 'max:150'],
-            'warranty_months'    => ['required', 'integer', 'min:1'],
-            'imei_required'      => ['sometimes', 'boolean'],
-            'screen_size_inches' => ['sometimes', 'nullable', 'numeric'],
-            'screen_resolution'  => ['sometimes', 'nullable', 'string', 'max:50'],
-            'panel_type'         => ['sometimes', 'nullable', 'string', 'max:50'],
-            'processor'          => ['sometimes', 'nullable', 'string', 'max:100'],
-            'ram_gb'             => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'storage_gb'         => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'bluetooth'          => ['sometimes', 'nullable', 'boolean'],
-            'wifi'               => ['sometimes', 'nullable', 'boolean'],
-            'nfc'                => ['sometimes', 'nullable', 'boolean'],
-            'cellular_network'   => ['sometimes', 'nullable', 'string', 'max:50'],
-            'battery_mah'        => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'main_camera_mp'     => ['sometimes', 'nullable', 'numeric'],
-            'power_watts'        => ['sometimes', 'nullable', 'numeric'],
-            'operating_system'   => ['sometimes', 'nullable', 'string', 'max:100'],
-            'weight_grams'       => ['sometimes', 'nullable', 'integer'],
-            'color'              => ['sometimes', 'nullable', 'string', 'max:50'],
-            'model_year'         => ['sometimes', 'nullable', 'integer'],
-            'additional_specs'   => ['sometimes', 'nullable', 'array'],
-        ]);
+        $validated = $request->validated();
 
         // B3: Explicit enum validation — error surfaces via global ValidationException handler
         $categoryEnum = DeviceCategory::tryFrom($validated['category']);
@@ -95,11 +71,6 @@ final class DeviceSpecController
             ], 404);
         }
 
-        // B1: D6 compliance — hydrate DTO from validated payload
-        $_ = StoreDeviceSpecData::from(
-            array_filter($validated, static fn (mixed $v): bool => $v !== null)
-        );
-
         try {
             $spec = $this->service->attach($product, $validated);
         } catch (DomainException $e) {
@@ -110,12 +81,12 @@ final class DeviceSpecController
             ], 409);
         }
 
-        return response()->json(['data' => $spec->toArray()], 201);
+        return response()->json(['data' => new DeviceSpecResource($spec)], 201);
     }
 
     public function show(DeviceSpec $deviceSpec): JsonResponse
     {
-        return response()->json(['data' => $deviceSpec->toArray()]);
+        return response()->json(['data' => new DeviceSpecResource($deviceSpec)]);
     }
 
     public function destroy(DeviceSpec $deviceSpec): JsonResponse
@@ -125,33 +96,9 @@ final class DeviceSpecController
         return response()->json(null, 204);
     }
 
-    public function update(Request $request, DeviceSpec $deviceSpec): JsonResponse
+    public function update(UpdateDeviceSpecRequest $request, DeviceSpec $deviceSpec): JsonResponse
     {
-        $validated = $request->validate([
-            'category'           => ['sometimes', 'string'],
-            'brand'              => ['sometimes', 'string', 'max:100'],
-            'model'              => ['sometimes', 'string', 'max:150'],
-            'warranty_months'    => ['sometimes', 'integer', 'min:1'],
-            'imei_required'      => ['sometimes', 'boolean'],
-            'screen_size_inches' => ['sometimes', 'nullable', 'numeric'],
-            'screen_resolution'  => ['sometimes', 'nullable', 'string', 'max:50'],
-            'panel_type'         => ['sometimes', 'nullable', 'string', 'max:50'],
-            'processor'          => ['sometimes', 'nullable', 'string', 'max:100'],
-            'ram_gb'             => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'storage_gb'         => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'bluetooth'          => ['sometimes', 'nullable', 'boolean'],
-            'wifi'               => ['sometimes', 'nullable', 'boolean'],
-            'nfc'                => ['sometimes', 'nullable', 'boolean'],
-            'cellular_network'   => ['sometimes', 'nullable', 'string', 'max:50'],
-            'battery_mah'        => ['sometimes', 'nullable', 'integer', 'min:1'],
-            'main_camera_mp'     => ['sometimes', 'nullable', 'numeric'],
-            'power_watts'        => ['sometimes', 'nullable', 'numeric'],
-            'operating_system'   => ['sometimes', 'nullable', 'string', 'max:100'],
-            'weight_grams'       => ['sometimes', 'nullable', 'integer'],
-            'color'              => ['sometimes', 'nullable', 'string', 'max:50'],
-            'model_year'         => ['sometimes', 'nullable', 'integer'],
-            'additional_specs'   => ['sometimes', 'nullable', 'array'],
-        ]);
+        $validated = $request->validated();
 
         // B3: Explicit enum validation for category when supplied
         if (array_key_exists('category', $validated)) {
@@ -163,13 +110,8 @@ final class DeviceSpecController
             }
         }
 
-        // B1: D6 compliance — hydrate DTO from validated payload
-        $_ = UpdateDeviceSpecData::from(
-            array_filter($validated, static fn (mixed $v): bool => $v !== null)
-        );
-
         $updated = $this->service->update($deviceSpec, $validated);
 
-        return response()->json(['data' => $updated->toArray()]);
+        return response()->json(['data' => new DeviceSpecResource($updated)]);
     }
 }

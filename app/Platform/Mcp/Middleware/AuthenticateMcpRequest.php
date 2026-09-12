@@ -32,6 +32,12 @@ final class AuthenticateMcpRequest
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        if ($mcpToken->isExpired()) {
+            $mcpToken->delete();
+
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
         $user = User::find($mcpToken->user_id);
 
         if ($user === null) {

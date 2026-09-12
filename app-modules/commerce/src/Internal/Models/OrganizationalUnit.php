@@ -19,7 +19,7 @@ final class OrganizationalUnit extends Model
     protected static function booted(): void
     {
         static::created(function (OrganizationalUnit $unit): void {
-            (new PerimeterLinker())->link($unit);
+            app(PerimeterLinker::class)->link($unit);
         });
     }
 

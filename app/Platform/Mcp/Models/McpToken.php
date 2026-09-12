@@ -20,11 +20,18 @@ final class McpToken extends Model
         'token',
         'abilities',
         'last_used_at',
+        'expires_at',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
         'abilities' => 'array',
         'last_used_at' => 'datetime',
+        'expires_at' => 'datetime',
     ];
+
+    public function isExpired(): bool
+    {
+        return $this->expires_at !== null && $this->expires_at->isPast();
+    }
 }

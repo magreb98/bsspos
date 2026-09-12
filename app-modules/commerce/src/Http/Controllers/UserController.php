@@ -6,13 +6,39 @@ namespace Modules\Commerce\Http\Controllers;
 
 use App\Platform\Identity\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Modules\Commerce\Http\Requests\AssignPosRequest;
+use Modules\Commerce\Http\Requests\StoreUserRequest;
+use Modules\Commerce\Http\Requests\UpdateUserRequest;
 use Modules\Commerce\Internal\Models\PointOfSale;
 
 final class UserController
 {
+    /**
+     * Base query on the hand-rolled member_point_of_sale pivot table.
+     *
+     * Note: this stays a raw query builder rather than an Eloquent BelongsToMany
+     * relation on App\Platform\Identity\Models\User. deptrac's ruleset pins
+     * `Platform: []` (Platform may depend on nothing), while
+     * Modules\Commerce\Internal\Models\PointOfSale lives in the DomaineCommerce layer —
+     * so a relation referencing it from the Platform-side User model would violate the
+     * module boundary. This helper (and pointsOfSaleQuery() below) only consolidates
+     * the duplicated pivot-table access that was previously repeated across all six
+     * call sites (index, store, update, listPos, assignPos, unassignPos).
+     */
+    private function pivotQuery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('member_point_of_sale');
+    }
+
+    /** Pivot query joined to points_of_sale, for read call sites that need the POS name/active columns. */
+    private function pointsOfSaleQuery(): \Illuminate\Database\Query\Builder
+    {
+        return $this->pivotQuery()
+            ->join('points_of_sale', 'member_point_of_sale.point_of_sale_id', '=', 'points_of_sale.id');
+    }
+
     public function index(): JsonResponse
     {
         $members = User::query()
@@ -22,8 +48,7 @@ final class UserController
         $memberIds = $members->pluck('id')->all();
 
         // Bulk-load POS assignments to avoid N+1
-        $posMap = DB::table('member_point_of_sale')
-            ->join('points_of_sale', 'member_point_of_sale.point_of_sale_id', '=', 'points_of_sale.id')
+        $posMap = $this->pointsOfSaleQuery()
             ->whereIn('member_point_of_sale.member_id', $memberIds)
             ->select('member_point_of_sale.member_id', 'points_of_sale.id', 'points_of_sale.name')
             ->get()
@@ -56,26 +81,25 @@ final class UserController
         return response()->json(['data' => $data]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreUserRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'              => ['required', 'string', 'max:200'],
-            'phone'             => ['required', 'string', 'max:20', 'unique:members,phone'],
-            'role'              => ['required', 'string', 'in:vendeur,gerant,gérant,proprietaire'],
-            'point_of_sale_ids' => ['nullable', 'array'],
-            'point_of_sale_ids.*' => ['string', 'exists:points_of_sale,id'],
-        ]);
+        $validated = $request->validated();
 
         $parts     = explode(' ', trim($validated['name']), 2);
         $firstName = $parts[0];
         $lastName  = $parts[1] ?? '';
 
         $member = User::create([
-            'first_name' => $firstName,
-            'last_name'  => $lastName,
-            'phone'      => $validated['phone'],
-            'password'   => Hash::make($validated['phone']),
-            'active'     => true,
+            'first_name'            => $firstName,
+            'last_name'             => $lastName,
+            'phone'                 => $validated['phone'],
+            // Initial password is the phone number for onboarding convenience
+            // (no SMS/e-mail delivery channel exists yet) — must_change_password
+            // forces the member to set a real password on first login so this
+            // known-to-many value can't be used to impersonate them afterwards.
+            'password'              => Hash::make($validated['phone']),
+            'active'                => true,
+            'must_change_password'  => true,
         ]);
 
         $role = match ($validated['role']) {
@@ -93,7 +117,7 @@ final class UserController
                 'created_at'      => now(),
                 'updated_at'      => now(),
             ], $posIds);
-            DB::table('member_point_of_sale')->insert($rows);
+            $this->pivotQuery()->insert($rows);
         }
 
         $posList = PointOfSale::whereIn('id', $posIds)->get(['id', 'name'])
@@ -114,14 +138,11 @@ final class UserController
         ], 201);
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateUserRequest $request, string $id): JsonResponse
     {
         $member = User::findOrFail($id);
 
-        $validated = $request->validate([
-            'role'   => ['sometimes', 'string', 'in:vendeur,gerant,gérant,proprietaire'],
-            'active' => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         if (isset($validated['role'])) {
             $role = match ($validated['role']) {
@@ -143,8 +164,7 @@ final class UserController
             default            => 'vendeur',
         };
 
-        $posList = DB::table('member_point_of_sale')
-            ->join('points_of_sale', 'member_point_of_sale.point_of_sale_id', '=', 'points_of_sale.id')
+        $posList = $this->pointsOfSaleQuery()
             ->where('member_point_of_sale.member_id', $member->id)
             ->select('points_of_sale.id', 'points_of_sale.name')
             ->get()
@@ -170,8 +190,7 @@ final class UserController
     {
         User::findOrFail($id);
 
-        $data = DB::table('member_point_of_sale')
-            ->join('points_of_sale', 'member_point_of_sale.point_of_sale_id', '=', 'points_of_sale.id')
+        $data = $this->pointsOfSaleQuery()
             ->where('member_point_of_sale.member_id', $id)
             ->select('points_of_sale.id', 'points_of_sale.name', 'points_of_sale.active')
             ->get();
@@ -180,23 +199,21 @@ final class UserController
     }
 
     /** POST /commerce/users/{id}/points-of-sale  body: { point_of_sale_id } */
-    public function assignPos(Request $request, string $id): JsonResponse
+    public function assignPos(AssignPosRequest $request, string $id): JsonResponse
     {
         User::findOrFail($id);
 
-        $validated = $request->validate([
-            'point_of_sale_id' => ['required', 'string', 'exists:points_of_sale,id'],
-        ]);
+        $validated = $request->validated();
 
         $posId = $validated['point_of_sale_id'];
 
-        $exists = DB::table('member_point_of_sale')
+        $exists = $this->pivotQuery()
             ->where('member_id', $id)
             ->where('point_of_sale_id', $posId)
             ->exists();
 
         if (! $exists) {
-            DB::table('member_point_of_sale')->insert([
+            $this->pivotQuery()->insert([
                 'member_id'       => $id,
                 'point_of_sale_id' => $posId,
                 'created_at'      => now(),
@@ -212,7 +229,7 @@ final class UserController
     {
         User::findOrFail($id);
 
-        DB::table('member_point_of_sale')
+        $this->pivotQuery()
             ->where('member_id', $id)
             ->where('point_of_sale_id', $posId)
             ->delete();

@@ -6,12 +6,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Control\Domaine;
 use App\Control\Tenant;
+use App\Http\Controllers\Admin\Concerns\RequiresSuperAdmin;
+use App\Http\Requests\Admin\StoreTenantRequest;
+use App\Http\Requests\Admin\UpdateTenantRequest;
+use App\Http\Resources\Admin\TenantMemberResource;
+use App\Http\Resources\Admin\TenantResource;
 use App\Platform\Tenancy\Jobs\ProvisionTenantJob;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 final class TenantController
 {
+    use RequiresSuperAdmin;
+
     public function index(Request $request): JsonResponse
     {
         $sortable = ['created_at', 'name', 'status', 'provisioning_step'];
@@ -36,7 +43,7 @@ final class TenantController
         $paginator = $query->paginate($perPage);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => TenantResource::collection($paginator->items()),
             'meta' => [
                 'total'        => $paginator->total(),
                 'current_page' => $paginator->currentPage(),
@@ -46,17 +53,9 @@ final class TenantController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTenantRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'                       => ['required', 'string', 'max:255'],
-            'domain'                     => ['required', 'string', 'max:255'],
-            'initial_admin'              => ['required', 'array'],
-            'initial_admin.first_name'   => ['required', 'string'],
-            'initial_admin.last_name'    => ['required', 'string'],
-            'initial_admin.phone'        => ['required', 'string'],
-            'initial_admin.password'     => ['required', 'string', 'min:8'],
-        ]);
+        $validated = $request->validated();
 
         if (Domaine::where('domain', $validated['domain'])->exists()) {
             return response()->json([
@@ -80,7 +79,7 @@ final class TenantController
 
         $tenant->load('domains');
 
-        return response()->json(['data' => $tenant->toArray()], 201);
+        return response()->json(['data' => new TenantResource($tenant)], 201);
     }
 
     public function show(string $id): JsonResponse
@@ -91,10 +90,10 @@ final class TenantController
             return response()->json(['code' => 'NOT_FOUND', 'message' => 'Entreprise introuvable.'], 404);
         }
 
-        return response()->json(['data' => $tenant->toArray()]);
+        return response()->json(['data' => new TenantResource($tenant)]);
     }
 
-    public function update(Request $request, string $id): JsonResponse
+    public function update(UpdateTenantRequest $request, string $id): JsonResponse
     {
         $tenant = Tenant::find($id);
 
@@ -102,16 +101,13 @@ final class TenantController
             return response()->json(['code' => 'NOT_FOUND', 'message' => 'Entreprise introuvable.'], 404);
         }
 
-        $validated = $request->validate([
-            'name'   => ['sometimes', 'string', 'max:255'],
-            'status' => ['sometimes', 'string', 'in:actif,suspendu'],
-        ]);
+        $validated = $request->validated();
 
         $tenant->update($validated);
 
         $tenant->load('domains');
 
-        return response()->json(['data' => $tenant->toArray()]);
+        return response()->json(['data' => new TenantResource($tenant)]);
     }
 
     public function reprovision(string $id): JsonResponse
@@ -133,7 +129,7 @@ final class TenantController
 
         $tenant->load('domains');
 
-        return response()->json(['data' => $tenant->toArray()]);
+        return response()->json(['data' => new TenantResource($tenant)]);
     }
 
     public function users(string $id): JsonResponse
@@ -158,11 +154,13 @@ final class TenantController
             // Tenant DB not ready
         }
 
-        return response()->json(['data' => $users]);
+        return response()->json(['data' => TenantMemberResource::collection($users)]);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
+        $this->assertActingAdminIsSuperAdmin($request);
+
         $tenant = Tenant::find($id);
 
         if ($tenant === null) {

@@ -6,8 +6,8 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Modules\Commerce\Http\Requests\DashboardRequest;
 use Modules\Commerce\Internal\Services\DashboardService;
 
 final class DashboardController
@@ -16,12 +16,9 @@ final class DashboardController
     {
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(DashboardRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'from' => 'required|date_format:Y-m-d',
-            'to'   => 'required|date_format:Y-m-d|after_or_equal:from',
-        ]);
+        $data = $request->validated();
 
         /** @var \App\Platform\Identity\Models\User $user */
         $user = Auth::user();

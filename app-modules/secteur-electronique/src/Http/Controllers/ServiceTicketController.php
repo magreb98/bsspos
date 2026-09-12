@@ -8,8 +8,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\SecteurElectronique\Enums\SerialStatus;
 use Modules\SecteurElectronique\Enums\TicketStatus;
-use Modules\SecteurElectronique\Http\Data\StoreServiceTicketData;
-use Modules\SecteurElectronique\Http\Data\UpdateServiceTicketData;
+use Modules\SecteurElectronique\Http\Requests\StoreServiceTicketRequest;
+use Modules\SecteurElectronique\Http\Requests\UpdateServiceTicketRequest;
+use Modules\SecteurElectronique\Http\Resources\ServiceTicketResource;
+use Modules\SecteurElectronique\Http\Resources\ServiceTicketSummaryResource;
 use Modules\SecteurElectronique\Models\SerialUnit;
 use Modules\SecteurElectronique\Models\ServiceTicket;
 use Modules\SecteurElectronique\Services\ServiceTicketService;
@@ -37,21 +39,7 @@ final class ServiceTicketController
 
         $paginator = $query->paginate(15);
 
-        $data = array_map(function (ServiceTicket $t): array {
-            $unit = $t->relationLoaded('serialUnit') ? $t->serialUnit : null;
-
-            return [
-                'id'            => $t->id,
-                'reference'     => strtoupper(substr($t->id, 0, 8)),
-                'customer'      => '',
-                'product'       => $unit?->product?->label ?? 'Appareil inconnu',
-                'imei'          => $unit?->serial_number ?? '',
-                'status'        => $t->status->value,
-                'repair_cost'   => $t->repair_cost ?? 0,
-                'under_warranty' => false,
-                'created_at'    => $t->created_at?->toIso8601String(),
-            ];
-        }, $paginator->items());
+        $data = array_map(fn (ServiceTicket $t) => new ServiceTicketSummaryResource($t), $paginator->items());
 
         return response()->json([
             'data' => $data,
@@ -64,12 +52,9 @@ final class ServiceTicketController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreServiceTicketRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'serial_unit_id' => ['required', 'uuid'],
-            'description'    => ['required', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $unit = SerialUnit::query()->whereKey($validated['serial_unit_id'])->first();
         if ($unit === null) {
@@ -88,19 +73,17 @@ final class ServiceTicketController
             ], 422);
         }
 
-        $_ = StoreServiceTicketData::from($validated);
-
         $ticket = $this->service->open($unit, $validated['description']);
 
-        return response()->json(['data' => $ticket->toArray()], 201);
+        return response()->json(['data' => new ServiceTicketResource($ticket)], 201);
     }
 
     public function show(ServiceTicket $serviceTicket): JsonResponse
     {
-        return response()->json(['data' => $serviceTicket->toArray()]);
+        return response()->json(['data' => new ServiceTicketResource($serviceTicket)]);
     }
 
-    public function update(Request $request, ServiceTicket $serviceTicket): JsonResponse
+    public function update(UpdateServiceTicketRequest $request, ServiceTicket $serviceTicket): JsonResponse
     {
         if ($serviceTicket->status === TicketStatus::Closed) {
             return response()->json([
@@ -110,15 +93,7 @@ final class ServiceTicketController
             ], 409);
         }
 
-        $validated = $request->validate([
-            'status'      => ['sometimes', 'string', 'in:open,in_repair,closed'],
-            'description' => ['sometimes', 'string'],
-            'repair_cost' => ['sometimes', 'nullable', 'integer', 'min:0'],
-        ]);
-
-        $_ = UpdateServiceTicketData::from(
-            array_filter($validated, static fn (mixed $v): bool => $v !== null)
-        );
+        $validated = $request->validated();
 
         $newStatus = isset($validated['status'])
             ? TicketStatus::from($validated['status'])
@@ -165,6 +140,6 @@ final class ServiceTicketController
 
         $serviceTicket->refresh();
 
-        return response()->json(['data' => $serviceTicket->toArray()]);
+        return response()->json(['data' => new ServiceTicketResource($serviceTicket)]);
     }
 }

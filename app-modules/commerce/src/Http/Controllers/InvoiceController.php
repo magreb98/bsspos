@@ -7,6 +7,9 @@ namespace Modules\Commerce\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Modules\Commerce\Http\Requests\RecordInvoicePaymentRequest;
+use Modules\Commerce\Http\Requests\StoreInvoiceRequest;
+use Modules\Commerce\Http\Resources\InvoiceResource;
 use Modules\Commerce\Internal\Enums\InvoiceStatus;
 use Modules\Commerce\Internal\Enums\SaleState;
 use Modules\Commerce\Internal\Models\Invoice;
@@ -39,7 +42,7 @@ final class InvoiceController
         $paginator = $query->paginate(20);
 
         return response()->json([
-            'data' => $paginator->items(),
+            'data' => InvoiceResource::collection($paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -49,17 +52,9 @@ final class InvoiceController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreInvoiceRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'client_id'  => ['required', 'uuid'],
-            'issue_date' => ['sometimes', 'date'],
-            'due_date'   => ['sometimes', 'nullable', 'date', 'after_or_equal:issue_date'],
-            'total_ht'   => ['required', 'integer', 'min:0'],
-            'total_vat'  => ['sometimes', 'integer', 'min:0'],
-            'total_ttc'  => ['required', 'integer', 'min:1'],
-            'notes'      => ['sometimes', 'nullable', 'string', 'max:2000'],
-        ]);
+        $validated = $request->validated();
 
         $invoice = DB::transaction(function () use ($validated): Invoice {
             /** @var int $lastSeq */
@@ -83,16 +78,16 @@ final class InvoiceController
             ]);
         });
 
-        return response()->json(['data' => $invoice->load('customer')->toArray()], 201);
+        return response()->json(['data' => new InvoiceResource($invoice->load('customer'))], 201);
     }
 
-    public function show(Invoice $invoice): JsonResponse
+    public function show(Request $request, Invoice $invoice): JsonResponse
     {
         $invoice->load(['customer', 'sale.lines.product', 'payments']);
         $setting = InvoiceSetting::first();
 
         return response()->json([
-            'data' => array_merge($invoice->toArray(), [
+            'data' => array_merge((new InvoiceResource($invoice))->resolve($request), [
                 'setting' => $setting?->toArray(),
             ]),
         ]);
@@ -139,7 +134,7 @@ final class InvoiceController
             ]);
         });
 
-        return response()->json(['data' => $invoice->load('customer', 'sale')->toArray()], 201);
+        return response()->json(['data' => new InvoiceResource($invoice->load('customer', 'sale'))], 201);
     }
 
     public function markSent(Invoice $invoice): JsonResponse
@@ -150,21 +145,18 @@ final class InvoiceController
 
         $invoice->update(['status' => InvoiceStatus::Sent]);
 
-        return response()->json(['data' => $invoice->fresh()?->toArray() ?? []]);
+        $freshInvoice = $invoice->fresh();
+
+        return response()->json(['data' => $freshInvoice !== null ? new InvoiceResource($freshInvoice) : []]);
     }
 
-    public function recordPayment(Request $request, Invoice $invoice): JsonResponse
+    public function recordPayment(RecordInvoicePaymentRequest $request, Invoice $invoice): JsonResponse
     {
         if ($invoice->status === InvoiceStatus::Paid) {
             return response()->json(['code' => 'ALREADY_PAID', 'message' => 'Invoice is already fully paid.', 'champ' => null], 409);
         }
 
-        $validated = $request->validate([
-            'amount'       => ['required', 'integer', 'min:1'],
-            'payment_date' => ['sometimes', 'date'],
-            'method'       => ['sometimes', 'string', 'max:50'],
-            'reference'    => ['sometimes', 'nullable', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         DB::transaction(function () use ($invoice, $validated): void {
             $locked = Invoice::where('id', $invoice->id)->lockForUpdate()->firstOrFail();
@@ -191,7 +183,9 @@ final class InvoiceController
             ]);
         });
 
-        return response()->json(['data' => $invoice->fresh()?->load('payments')->toArray() ?? []]);
+        $freshInvoice = $invoice->fresh();
+
+        return response()->json(['data' => $freshInvoice !== null ? new InvoiceResource($freshInvoice->load('payments')) : []]);
     }
 
     public function pdf(Invoice $invoice, \Illuminate\Http\Request $request): Response

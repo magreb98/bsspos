@@ -5,31 +5,34 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StorePaymentRequest;
+use Modules\Commerce\Http\Resources\PaymentResource;
 use Modules\Commerce\Internal\Enums\PaymentStatus;
 use Modules\Commerce\Internal\Models\Currency;
 use Modules\Commerce\Internal\Models\Payment;
 use Modules\Commerce\Internal\Models\PaymentMethodConfig;
 use Modules\Commerce\Internal\Models\Sale;
+use Modules\Commerce\Internal\Services\SaleAccessGuard;
 
 final class PaymentController
 {
-    public function index(Sale $sale): JsonResponse
-    {
-        return response()->json(['data' => $sale->payments()->orderBy('created_at')->get()->toArray()]);
+    public function __construct(
+        private readonly SaleAccessGuard $accessGuard,
+    ) {
     }
 
-    public function store(Request $request, Sale $sale): JsonResponse
+    public function index(Sale $sale): JsonResponse
     {
-        $activeKeys = PaymentMethodConfig::where('active', true)->pluck('key')->toArray();
+        $this->accessGuard->ensureAccessible($sale);
 
-        $validated = $request->validate([
-            'method'        => ['required', 'string', 'in:' . implode(',', $activeKeys)],
-            'amount'        => ['required', 'integer', 'min:1'],
-            'reference'     => ['sometimes', 'nullable', 'string', 'max:100'],
-            'currency_code' => ['sometimes', 'string', 'size:3'],
-            'exchange_rate' => ['sometimes', 'integer', 'min:1'],
-        ]);
+        return response()->json(['data' => PaymentResource::collection($sale->payments()->orderBy('created_at')->get())]);
+    }
+
+    public function store(StorePaymentRequest $request, Sale $sale): JsonResponse
+    {
+        $this->accessGuard->ensureAccessible($sale);
+
+        $validated = $request->validated();
 
         $currencyCode = strtoupper((string) ($validated['currency_code'] ?? 'XAF'));
         $amountInput  = (int) $validated['amount'];
@@ -65,6 +68,6 @@ final class PaymentController
             'confirmed_at'    => $autoConfirm ? now() : null,
         ]);
 
-        return response()->json(['data' => $payment->toArray()], 201);
+        return response()->json(['data' => new PaymentResource($payment)], 201);
     }
 }

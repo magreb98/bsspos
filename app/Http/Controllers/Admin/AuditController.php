@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Control\Tenant;
+use App\Http\Requests\Admin\AuditLogExportRequest;
+use App\Http\Requests\Admin\AuditLogIndexRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 final class AuditController
 {
-    public function index(Request $request): JsonResponse
+    public function index(AuditLogIndexRequest $request): JsonResponse
     {
         $perPage  = min((int) $request->input('per_page', 25), 100);
         $page     = max((int) $request->input('page', 1), 1);
@@ -87,7 +88,7 @@ final class AuditController
         ]);
     }
 
-    public function export(Request $request): StreamedResponse
+    public function export(AuditLogExportRequest $request): StreamedResponse
     {
         $tenantId = $request->input('tenant_id');
         $tool     = $request->input('tool');

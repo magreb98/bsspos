@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Commerce\Http\Controllers;
 
+use App\Platform\Identity\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\SyncRequest;
 use Modules\Commerce\Internal\Services\OfflineSyncService;
 use Modules\Commerce\Internal\Sync\OfflineSaleRequest;
 
@@ -15,22 +16,9 @@ final class SyncController
     {
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(SyncRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'sales'                                        => 'required|array',
-            'sales.*.idempotency_key'                      => 'required|string',
-            'sales.*.cash_session_id'                      => 'required|uuid',
-            'sales.*.lines'                                => 'required|array|min:1',
-            'sales.*.lines.*.product_id'                   => 'required|uuid',
-            'sales.*.lines.*.quantity'                     => 'required|integer|min:1',
-            'sales.*.lines.*.designation'                  => 'required|string',
-            'sales.*.lines.*.unit_price'                   => 'required|integer|min:0',
-            'sales.*.lines.*.vat_rate'                     => 'required|string',
-            'sales.*.lines.*.line_total_excluding_tax'     => 'required|integer|min:0',
-            'sales.*.lines.*.line_total_tax'               => 'required|integer|min:0',
-            'sales.*.lines.*.line_total_including_tax'     => 'required|integer|min:0',
-        ]);
+        $data = $request->validated();
 
         /** @var list<OfflineSaleRequest> $requests */
         $requests = array_map(
@@ -42,7 +30,10 @@ final class SyncController
             $data['sales'],
         );
 
-        $result = $this->service->sync($requests);
+        /** @var User $member */
+        $member = $request->user();
+
+        $result = $this->service->sync($requests, $member);
 
         return response()->json([
             'data' => [

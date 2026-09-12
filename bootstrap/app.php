@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\AuthenticateAdminRequest;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -55,7 +58,30 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code'    => 'VALIDATION_ERROR',
                     'message' => $firstMessage,
                     'champ'   => $firstField,
+                    // Full set of failures, so a client isn't limited to the first
+                    // invalid field the way 'champ'/'message' above necessarily are.
+                    'errors'  => $e->errors(),
                 ], 422);
+            }
+        });
+
+        $exceptions->render(function (AuthorizationException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'code'    => 'FORBIDDEN',
+                    'message' => $e->getMessage() !== '' ? $e->getMessage() : 'Action non autorisée.',
+                    'champ'   => null,
+                ], 403);
+            }
+        });
+
+        $exceptions->render(function (ModelNotFoundException|NotFoundHttpException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'code'    => 'NOT_FOUND',
+                    'message' => 'Ressource introuvable.',
+                    'champ'   => null,
+                ], 404);
             }
         });
     })->create();

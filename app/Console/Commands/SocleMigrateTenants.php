@@ -24,6 +24,8 @@ class SocleMigrateTenants extends Command
             ? Tenant::query()->whereIn('id', $uuids)->orderBy('created_at')->get()
             : Tenant::query()->where('status', 'actif')->orderBy('created_at')->get();
 
+        $failures = [];
+
         foreach ($tenants as $tenant) {
             try {
                 $this->migrateTenant($tenant);
@@ -36,10 +38,17 @@ class SocleMigrateTenants extends Command
                 );
                 $this->line("Tenant {$tenant->id} migrated.");
             } catch (\Throwable $e) {
+                // Don't let one bad tenant block migrations for the rest of
+                // the fleet — record the failure and keep going.
                 $this->error("Failed tenant {$tenant->id}: {$e->getMessage()}");
-
-                return self::FAILURE;
+                $failures[] = $tenant->id;
             }
+        }
+
+        if ($failures !== []) {
+            $this->error(sprintf('%d tenant(s) failed to migrate: %s', count($failures), implode(', ', $failures)));
+
+            return self::FAILURE;
         }
 
         return self::SUCCESS;

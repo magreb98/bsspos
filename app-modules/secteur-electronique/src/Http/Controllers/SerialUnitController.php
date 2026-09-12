@@ -9,7 +9,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Commerce\Internal\Models\Product;
 use Modules\SecteurElectronique\Enums\SerialStatus;
-use Modules\SecteurElectronique\Http\Data\StoreSerialUnitData;
+use Modules\SecteurElectronique\Http\Requests\StoreSerialUnitRequest;
+use Modules\SecteurElectronique\Http\Resources\SerialUnitResource;
 use Modules\SecteurElectronique\Models\SerialUnit;
 use Modules\SecteurElectronique\Services\SerialService;
 
@@ -35,7 +36,7 @@ final class SerialUnitController
         $paginator = $query->paginate(15);
 
         return response()->json([
-            'data' => array_map(fn (SerialUnit $u) => $u->toArray(), $paginator->items()),
+            'data' => array_map(fn (SerialUnit $u) => new SerialUnitResource($u), $paginator->items()),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'per_page'     => $paginator->perPage(),
@@ -45,12 +46,9 @@ final class SerialUnitController
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreSerialUnitRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'product_id'    => ['required', 'uuid'],
-            'serial_number' => ['required', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         $product = Product::query()->whereKey($validated['product_id'])->first();
         if ($product === null) {
@@ -60,8 +58,6 @@ final class SerialUnitController
                 'champ'   => null,
             ], 404);
         }
-
-        $_ = StoreSerialUnitData::from($validated);
 
         try {
             $unit = $this->service->register($product, $validated['serial_number']);
@@ -73,12 +69,12 @@ final class SerialUnitController
             ], 409);
         }
 
-        return response()->json(['data' => $unit->toArray()], 201);
+        return response()->json(['data' => new SerialUnitResource($unit)], 201);
     }
 
     public function show(SerialUnit $serialUnit): JsonResponse
     {
-        return response()->json(['data' => $serialUnit->toArray()]);
+        return response()->json(['data' => new SerialUnitResource($serialUnit)]);
     }
 
     public function destroy(SerialUnit $serialUnit): JsonResponse

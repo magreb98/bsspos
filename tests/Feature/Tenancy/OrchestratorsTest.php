@@ -59,10 +59,10 @@ test('it_migrates_all_active_tenants_and_updates_the_version', function (): void
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// T6 — immediate stop on the first failing tenant
+// T6 — one failing tenant doesn't block the rest of the fleet
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('it_stops_migration_at_the_first_failing_tenant', function (): void {
+test('it_continues_migrating_remaining_tenants_after_one_failure', function (): void {
     // Arrange — three active tenants; the second will cause a failure.
     $tenantFirst  = \App\Control\Tenant::create([
         'name'   => 'First SARL',
@@ -100,18 +100,22 @@ test('it_stops_migration_at_the_first_failing_tenant', function (): void {
         };
     });
 
-    // Act — the command must stop after the second tenant (exit code 1)
+    // Act — the command must still report failure (exit code 1) since one
+    // tenant failed, but it must not let that failure block the rest of the
+    // fleet from being migrated.
     $this->artisan('socle:migrate-tenants')
         ->assertExitCode(1);
 
-    // Assert — only the first is recorded in tenant_schema_versions
+    // Assert — first AND third are recorded; only the second (which threw)
+    // is missing from tenant_schema_versions.
     $versions = DB::table('tenant_schema_versions')
         ->pluck('tenant_id')
         ->toArray();
 
     expect($versions)
         ->toContain($tenantFirst->id)
-        ->not->toContain($tenantThird->id);
+        ->toContain($tenantThird->id)
+        ->not->toContain($tenantSecond->id);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

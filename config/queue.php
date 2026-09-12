@@ -39,7 +39,13 @@ return [
 
         'database' => [
             'driver' => 'database',
-            'connection' => env('DB_QUEUE_CONNECTION'),
+            // Must always resolve to the CENTRAL connection: the `jobs` /
+            // `job_batches` / `failed_jobs` tables only exist there, never in a
+            // tenant database. Falling back to null would resolve against
+            // whatever connection is currently the app default, which is
+            // `tenant` during tenant requests (see
+            // App\Platform\Tenancy\Bootstrappers\SwitchTenantConnection).
+            'connection' => env('DB_QUEUE_CONNECTION', env('DB_CONNECTION', 'sqlite')),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
             'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 90),

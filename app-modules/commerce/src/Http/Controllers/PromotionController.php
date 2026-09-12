@@ -6,6 +6,12 @@ namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Commerce\Http\Requests\StoreCouponRequest;
+use Modules\Commerce\Http\Requests\StorePromotionRequest;
+use Modules\Commerce\Http\Requests\UpdatePromotionRequest;
+use Modules\Commerce\Http\Requests\ValidateCouponRequest;
+use Modules\Commerce\Http\Resources\CouponResource;
+use Modules\Commerce\Http\Resources\PromotionResource;
 use Modules\Commerce\Internal\Models\Coupon;
 use Modules\Commerce\Internal\Models\Promotion;
 
@@ -21,52 +27,33 @@ final class PromotionController
 
         $promotions = $query->orderBy('starts_at')->get();
 
-        return response()->json(['data' => $promotions->toArray()]);
+        return response()->json(['data' => PromotionResource::collection($promotions)]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StorePromotionRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name'       => ['required', 'string', 'max:255'],
-            'type'       => ['required', 'string', 'in:percent,fixed_amount'],
-            'value'      => ['required', 'integer', 'min:1'],
-            'scope'      => ['required', 'string', 'in:product,family'],
-            'scope_id'   => ['sometimes', 'nullable', 'uuid'],
-            'starts_at'  => ['sometimes', 'nullable', 'date'],
-            'ends_at'    => ['sometimes', 'nullable', 'date', 'after_or_equal:starts_at'],
-            'cumulative' => ['sometimes', 'boolean'],
-            'active'     => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $promotion = Promotion::create(array_merge($validated, [
             'cumulative' => $validated['cumulative'] ?? false,
             'active'     => $validated['active'] ?? true,
         ]));
 
-        return response()->json(['data' => $promotion->toArray()], 201);
+        return response()->json(['data' => new PromotionResource($promotion)], 201);
     }
 
-    public function update(Request $request, Promotion $promotion): JsonResponse
+    public function update(UpdatePromotionRequest $request, Promotion $promotion): JsonResponse
     {
-        $validated = $request->validate([
-            'name'       => ['sometimes', 'string', 'max:255'],
-            'value'      => ['sometimes', 'integer', 'min:1'],
-            'starts_at'  => ['sometimes', 'nullable', 'date'],
-            'ends_at'    => ['sometimes', 'nullable', 'date'],
-            'cumulative' => ['sometimes', 'boolean'],
-            'active'     => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $promotion->update($validated);
 
-        return response()->json(['data' => $promotion->fresh()?->toArray() ?? $promotion->toArray()]);
+        return response()->json(['data' => new PromotionResource($promotion->fresh() ?? $promotion)]);
     }
 
-    public function validateCoupon(Request $request): JsonResponse
+    public function validateCoupon(ValidateCouponRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'code' => ['required', 'string'],
-        ]);
+        $validated = $request->validated();
 
         $coupon = Coupon::query()
             ->where('code', $validated['code'])
@@ -89,19 +76,16 @@ final class PromotionController
 
         return response()->json([
             'data' => [
-                'coupon'    => $coupon->toArray(),
-                'promotion' => $promotion->toArray(),
+                'coupon'    => new CouponResource($coupon),
+                'promotion' => new PromotionResource($promotion),
                 'valid'     => true,
             ],
         ]);
     }
 
-    public function storeCoupon(Request $request, Promotion $promotion): JsonResponse
+    public function storeCoupon(StoreCouponRequest $request, Promotion $promotion): JsonResponse
     {
-        $validated = $request->validate([
-            'code'     => ['required', 'string', 'max:50', 'unique:coupons,code'],
-            'max_uses' => ['sometimes', 'nullable', 'integer', 'min:1'],
-        ]);
+        $validated = $request->validated();
 
         $coupon = Coupon::create([
             'code'         => strtoupper($validated['code']),
@@ -110,6 +94,6 @@ final class PromotionController
             'times_used'   => 0,
         ]);
 
-        return response()->json(['data' => $coupon->toArray()], 201);
+        return response()->json(['data' => new CouponResource($coupon)], 201);
     }
 }

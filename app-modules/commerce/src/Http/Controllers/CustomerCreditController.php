@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Commerce\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\Commerce\Http\Resources\CustomerCreditResource;
 use Modules\Commerce\Internal\Models\Customer;
 use Modules\Commerce\Internal\Models\CustomerCredit;
 
@@ -21,7 +22,7 @@ final class CustomerCreditController
 
         return response()->json([
             'data' => [
-                'credits'         => $credits->toArray(),
+                'credits'         => CustomerCreditResource::collection($credits),
                 'total_remaining' => $totalRemaining,
             ],
         ]);
