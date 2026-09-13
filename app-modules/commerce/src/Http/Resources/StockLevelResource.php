@@ -23,9 +23,9 @@ final class StockLevelResource extends JsonResource
             'minimum_quantity'   => $this->minimum_quantity,
             'created_at'         => $this->created_at,
             'updated_at'         => $this->updated_at,
-            'pointOfSale'        => new PointOfSaleResource($this->whenLoaded('pointOfSale')),
+            'point_of_sale'      => new PointOfSaleResource($this->whenLoaded('pointOfSale')),
             'product'            => new ProductResource($this->whenLoaded('product')),
-            'productVariant'     => new ProductVariantResource($this->whenLoaded('productVariant')),
+            'product_variant'    => new ProductVariantResource($this->whenLoaded('productVariant')),
         ];
     }
 }

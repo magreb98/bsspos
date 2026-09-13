@@ -22,12 +22,11 @@ final class CashSessionResource extends JsonResource
             'closed_at'         => $this->closed_at,
             'opening_balance'   => $this->opening_balance,
             'closing_balance'   => $this->closing_balance,
-            'opened_by'         => $this->opened_by,
             'closed_by'         => $this->closed_by,
             'created_at'        => $this->created_at,
             'updated_at'        => $this->updated_at,
-            'cashRegister'      => new CashRegisterResource($this->whenLoaded('cashRegister')),
-            'openedBy'          => new MemberResource($this->whenLoaded('openedBy')),
+            'cash_register'     => new CashRegisterResource($this->whenLoaded('cashRegister')),
+            'opened_by'         => new MemberResource($this->whenLoaded('openedBy')),
         ];
     }
 }

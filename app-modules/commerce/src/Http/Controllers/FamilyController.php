@@ -14,7 +14,7 @@ final class FamilyController
 {
     public function index(): JsonResponse
     {
-        $families = Family::query()->orderBy('name')->get();
+        $families = Family::query()->where('active', true)->orderBy('name')->get();
 
         return response()->json(['data' => FamilyResource::collection($families)]);
     }
@@ -47,5 +47,28 @@ final class FamilyController
         $family->update($validated);
 
         return response()->json(['data' => new FamilyResource($family->fresh() ?? $family)]);
+    }
+
+    public function destroy(Family $family): JsonResponse
+    {
+        if ($family->products()->exists()) {
+            return response()->json([
+                'code'    => 'FAMILY_HAS_PRODUCTS',
+                'message' => 'Impossible de supprimer une famille utilisée par des produits.',
+                'champ'   => null,
+            ], 409);
+        }
+
+        if ($family->children()->exists()) {
+            return response()->json([
+                'code'    => 'FAMILY_HAS_CHILDREN',
+                'message' => 'Impossible de supprimer une famille ayant des sous-familles.',
+                'champ'   => null,
+            ], 409);
+        }
+
+        $family->update(['active' => false]);
+
+        return response()->json([], 204);
     }
 }

@@ -107,9 +107,9 @@
         <td>{{ $i + 1 }}</td>
         <td>{{ $line->designation }}</td>
         <td class="r">{{ $line->quantity }}</td>
-        <td class="r">{{ number_format($line->unit_price?->toInt() ?? 0, 0, ',', '\u{202F}') }}</td>
+        <td class="r">{{ number_format($line->unit_price?->toInt() ?? 0, 0, ',', "\u{00A0}") }}</td>
         <td class="r">{{ $line->vat_rate }}&nbsp;%</td>
-        <td class="r">{{ number_format($line->line_total_including_tax?->toInt() ?? 0, 0, ',', '\u{202F}') }}</td>
+        <td class="r">{{ number_format($line->line_total_including_tax?->toInt() ?? 0, 0, ',', "\u{00A0}") }}</td>
       </tr>
       @endforeach
     @else
@@ -120,17 +120,17 @@
 
 <div class="totals-wrap">
   <table class="totals-table">
-    <tr><td>Sous-total HT</td><td class="r">{{ number_format($invoice->total_ht?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
-    <tr><td>TVA</td><td class="r">{{ number_format($invoice->total_vat?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
-    <tr class="sep grand"><td>TOTAL TTC</td><td class="r">{{ number_format($invoice->total_ttc?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
+    <tr><td>Sous-total HT</td><td class="r">{{ number_format($invoice->total_ht?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
+    <tr><td>TVA</td><td class="r">{{ number_format($invoice->total_vat?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
+    <tr class="sep grand"><td>TOTAL TTC</td><td class="r">{{ number_format($invoice->total_ttc?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
   </table>
 </div>
 
 @php $outstanding = $invoice->outstanding_amount?->toInt() ?? 0; @endphp
 @if($outstanding > 0)
 <div class="outstanding">
-  Montant déjà réglé&nbsp;: <strong>{{ number_format($invoice->paid_amount?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</strong><br>
-  <strong>Reste à payer&nbsp;: {{ number_format($outstanding, 0, ',', '\u{202F}') }}&nbsp;FCFA</strong>
+  Montant déjà réglé&nbsp;: <strong>{{ number_format($invoice->paid_amount?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</strong><br>
+  <strong>Reste à payer&nbsp;: {{ number_format($outstanding, 0, ',', "\u{00A0}") }}&nbsp;FCFA</strong>
   @if($invoice->due_date) — Échéance le {{ $invoice->due_date->format('d/m/Y') }} @endif
 </div>
 @else
@@ -145,7 +145,7 @@
   @foreach($invoice->payments as $p)
   <div class="payment-row">
     <span>{{ $p->payment_date->format('d/m/Y') }} — {{ strtoupper((string) $p->method) }}</span>
-    <span>{{ number_format($p->amount?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</span>
+    <span>{{ number_format($p->amount?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</span>
   </div>
   @endforeach
 </div>

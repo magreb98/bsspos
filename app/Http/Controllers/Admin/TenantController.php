@@ -157,6 +157,29 @@ final class TenantController
         return response()->json(['data' => TenantMemberResource::collection($users)]);
     }
 
+    public function updateUser(Request $request, string $id, string $userId): JsonResponse
+    {
+        $tenant = Tenant::find($id);
+
+        if ($tenant === null) {
+            return response()->json(['code' => 'NOT_FOUND', 'message' => 'Entreprise introuvable.'], 404);
+        }
+
+        $active = (bool) $request->input('active');
+
+        try {
+            $tenant->run(function () use ($userId, $active): void {
+                \Illuminate\Support\Facades\DB::table('members')
+                    ->where('id', $userId)
+                    ->update(['active' => $active]);
+            });
+        } catch (\Throwable) {
+            return response()->json(['code' => 'TENANT_DB_ERROR', 'message' => 'Base de données tenant inaccessible.'], 500);
+        }
+
+        return response()->json([], 204);
+    }
+
     public function destroy(Request $request, string $id): JsonResponse
     {
         $this->assertActingAdminIsSuperAdmin($request);

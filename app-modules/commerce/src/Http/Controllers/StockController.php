@@ -7,23 +7,20 @@ namespace Modules\Commerce\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Modules\Commerce\Http\Resources\StockLevelResource;
-use Modules\Commerce\Internal\Models\StockLevel;
+use Modules\Commerce\Internal\Services\StockLevelQueryService;
 
 final class StockController
 {
+    public function __construct(private readonly StockLevelQueryService $service)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $query = StockLevel::query()->with(['product', 'pointOfSale']);
-
-        if ($request->filled('point_of_sale_id')) {
-            $query->where('point_of_sale_id', $request->input('point_of_sale_id'));
-        }
-
-        if ($request->filled('product_id')) {
-            $query->where('product_id', $request->input('product_id'));
-        }
-
-        $levels = $query->get();
+        $levels = $this->service->compute(
+            $request->filled('point_of_sale_id') ? (string) $request->input('point_of_sale_id') : null,
+            $request->filled('product_id') ? (string) $request->input('product_id') : null,
+        );
 
         return response()->json(['data' => StockLevelResource::collection($levels)]);
     }

@@ -14,12 +14,16 @@ use Modules\Commerce\Internal\Models\Sale;
 
 final class CashClosingService
 {
-    public function close(CashSession $session, int $declaredCash, string $closedBy): CashClosing
+    /**
+     * Live cash position for an open session — same formula used at actual
+     * closing time (see close()), exposed early so the "Session en cours"
+     * screen can show a number that means something before the drawer is
+     * counted, instead of ignoring the day's cash sales entirely.
+     *
+     * @return array{opening_balance: int, cash_sales: int, mobile_money_sales: int, expenses: int, expected_cash: int}
+     */
+    public function computeExpected(CashSession $session): array
     {
-        if (! $session->isOpen()) {
-            throw new \DomainException('Cannot close a session that is not open.');
-        }
-
         $saleIds = Sale::where('cash_session_id', $session->id)->pluck('id');
 
         $cashSales = (int) Payment::whereIn('sale_id', $saleIds)
@@ -35,16 +39,32 @@ final class CashClosingService
         $totalExpenses = (int) Expense::where('cash_session_id', $session->id)->sum('amount');
 
         $openingBalance = $session->opening_balance?->toInt() ?? 0;
-        $expectedCash   = $openingBalance + $cashSales - $totalExpenses;
-        $discrepancy    = $declaredCash - $expectedCash;
 
-        $closing = CashClosing::create([
-            'cash_session_id'    => $session->id,
+        return [
             'opening_balance'    => $openingBalance,
             'cash_sales'         => $cashSales,
             'mobile_money_sales' => $mobileMoneySales,
             'expenses'           => $totalExpenses,
-            'expected_cash'      => $expectedCash,
+            'expected_cash'      => $openingBalance + $cashSales - $totalExpenses,
+        ];
+    }
+
+    public function close(CashSession $session, int $declaredCash, string $closedBy): CashClosing
+    {
+        if (! $session->isOpen()) {
+            throw new \DomainException('Cannot close a session that is not open.');
+        }
+
+        $computed = $this->computeExpected($session);
+        $discrepancy = $declaredCash - $computed['expected_cash'];
+
+        $closing = CashClosing::create([
+            'cash_session_id'    => $session->id,
+            'opening_balance'    => $computed['opening_balance'],
+            'cash_sales'         => $computed['cash_sales'],
+            'mobile_money_sales' => $computed['mobile_money_sales'],
+            'expenses'           => $computed['expenses'],
+            'expected_cash'      => $computed['expected_cash'],
             'declared_cash'      => $declaredCash,
             'discrepancy'        => $discrepancy,
         ]);

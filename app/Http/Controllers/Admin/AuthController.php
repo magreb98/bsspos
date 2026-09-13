@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Control\AdminToken;
 use App\Control\AdminUser;
+use App\Http\Requests\Admin\ChangePasswordRequest;
 use App\Http\Requests\Admin\LoginRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,9 +48,10 @@ final class AuthController
         return response()->json([
             'token' => $rawToken,
             'user'  => [
-                'id'    => $admin->id,
-                'name'  => $admin->name,
-                'email' => $admin->email,
+                'id'             => $admin->id,
+                'name'           => $admin->name,
+                'email'          => $admin->email,
+                'is_super_admin' => $admin->is_super_admin,
             ],
         ]);
     }
@@ -75,8 +77,31 @@ final class AuthController
                 'id'                 => $admin->id,
                 'name'               => $admin->name,
                 'email'              => $admin->email,
+                'is_super_admin'     => $admin->is_super_admin,
                 'last_connected_at'  => $admin->last_connected_at?->toIso8601String(),
             ],
         ]);
+    }
+
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        /** @var AdminUser $admin */
+        $admin = $request->attributes->get('admin_user');
+
+        $validated = $request->validated();
+
+        if (! $admin->checkPassword($validated['current_password'])) {
+            return response()->json([
+                'code'    => 'INVALID_CURRENT_PASSWORD',
+                'message' => 'Mot de passe actuel incorrect.',
+                'champ'   => 'current_password',
+            ], 422);
+        }
+
+        // AdminUser casts 'password' => 'hashed', so the model hashes this
+        // for us — calling Hash::make() here too would double-hash.
+        $admin->update(['password' => $validated['new_password']]);
+
+        return response()->json(['message' => 'Mot de passe mis à jour.']);
     }
 }

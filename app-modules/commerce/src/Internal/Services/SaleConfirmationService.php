@@ -19,6 +19,7 @@ final class SaleConfirmationService
     public function __construct(
         private readonly AllocateNumber $allocateNumber = new AllocateNumber(),
         private readonly PublishMessage $publishMessage = new PublishMessage(),
+        private readonly DashboardService $dashboardService = new DashboardService(),
     ) {
     }
 
@@ -58,6 +59,8 @@ final class SaleConfirmationService
             'total_including_tax' => $totalTtc,
             'confirmed_at'        => now(),
         ]);
+
+        $this->dashboardService->record($pos->id, now(), 1, $totalHt, $totalTax, $totalTtc);
 
         foreach ($lines as $line) {
             if ($line->product === null || $line->product->granularity === Granularity::Service) {

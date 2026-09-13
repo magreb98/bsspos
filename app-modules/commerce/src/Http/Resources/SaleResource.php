@@ -32,7 +32,7 @@ final class SaleResource extends JsonResource
             'updated_at'           => $this->updated_at,
             'lines_count'          => $this->whenCounted('lines'),
             'customer'             => new CustomerResource($this->whenLoaded('customer')),
-            'cashSession'          => new CashSessionResource($this->whenLoaded('cashSession')),
+            'cash_session'         => new CashSessionResource($this->whenLoaded('cashSession')),
             'lines'                => SaleLineResource::collection($this->whenLoaded('lines')),
             'payments'             => PaymentResource::collection($this->whenLoaded('payments')),
             'originalSale'         => new SaleResource($this->whenLoaded('originalSale')),

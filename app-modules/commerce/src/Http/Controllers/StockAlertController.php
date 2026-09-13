@@ -9,25 +9,25 @@ use Illuminate\Http\Request;
 use Modules\Commerce\Http\Requests\SetStockThresholdRequest;
 use Modules\Commerce\Http\Resources\StockLevelResource;
 use Modules\Commerce\Internal\Models\StockLevel;
+use Modules\Commerce\Internal\Services\StockLevelQueryService;
 
 final class StockAlertController
 {
+    public function __construct(private readonly StockLevelQueryService $service)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $query = StockLevel::query()
-            ->with('product', 'pointOfSale')
-            ->whereColumn('quantity', '<', 'minimum_quantity')
-            ->where('minimum_quantity', '>', 0);
+        $levels = $this->service->compute(
+            $request->filled('point_of_sale_id') ? (string) $request->input('point_of_sale_id') : null,
+            $request->filled('product_id') ? (string) $request->input('product_id') : null,
+        );
 
-        if ($request->filled('point_of_sale_id')) {
-            $query->where('point_of_sale_id', $request->input('point_of_sale_id'));
-        }
-
-        if ($request->filled('product_id')) {
-            $query->where('product_id', $request->input('product_id'));
-        }
-
-        $alerts = $query->orderBy('quantity')->get();
+        $alerts = $levels
+            ->filter(fn (StockLevel $level): bool => $level->minimum_quantity > 0 && $level->quantity < $level->minimum_quantity)
+            ->sortBy('quantity')
+            ->values();
 
         return response()->json(['data' => StockLevelResource::collection($alerts)]);
     }

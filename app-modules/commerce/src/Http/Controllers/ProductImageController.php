@@ -55,7 +55,7 @@ final class ProductImageController
             : (int) (($product->images()->max('position') ?? -1) + 1);
 
         $image = $product->images()->create([
-            'url'      => $path,
+            'url'      => '/storage/'.$path,
             'position' => $position,
         ]);
 

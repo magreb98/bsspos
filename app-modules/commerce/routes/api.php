@@ -72,6 +72,7 @@ Route::prefix('commerce')->name('commerce.')->middleware([AuthenticateMemberRequ
     Route::middleware('permission:family.write')->group(function (): void {
         Route::post('families', [FamilyController::class, 'store'])->name('families.store');
         Route::match(['put', 'patch'], 'families/{family}', [FamilyController::class, 'update'])->name('families.update');
+        Route::delete('families/{family}', [FamilyController::class, 'destroy'])->name('families.destroy');
     });
 
     // ── Produits ─────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ Route::prefix('commerce')->name('commerce.')->middleware([AuthenticateMemberRequ
         Route::post('cash-sessions', [CashSessionController::class, 'store'])->name('cash-sessions.store');
         Route::get('cash-sessions/active', [CashSessionController::class, 'showActive'])->name('cash-sessions.active');
         Route::get('cash-sessions/{cash_session}/closing', [CashClosingController::class, 'show'])->name('cash-sessions.closing.show');
+        Route::get('cash-sessions/{cash_session}/expected-cash', [CashClosingController::class, 'expected'])->name('cash-sessions.expected-cash');
     });
     // Clôture de caisse — gérant et propriétaire uniquement
     Route::middleware('permission:cash-session.close')->group(function (): void {
@@ -138,6 +140,10 @@ Route::prefix('commerce')->name('commerce.')->middleware([AuthenticateMemberRequ
     Route::get('stock/movements', [StockMovementController::class, 'index'])
         ->name('stock.movements')
         ->middleware('permission:inventory.list');
+
+    Route::post('stock/movements', [StockMovementController::class, 'store'])
+        ->name('stock.movements.store')
+        ->middleware('permission:inventory.write');
 
     // ── Inventaires ───────────────────────────────────────────────────────────
     Route::middleware('permission:inventory.write')->group(function (): void {

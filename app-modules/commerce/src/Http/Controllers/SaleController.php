@@ -74,7 +74,9 @@ final class SaleController
             $query->whereDate('created_at', '<=', $request->input('to'));
         }
 
-        $paginator = $query->paginate(20);
+        $perPage = $request->filled('per_page') ? min(100, max(1, (int) $request->input('per_page'))) : 20;
+
+        $paginator = $query->paginate($perPage);
 
         return response()->json([
             'data' => SaleResource::collection($paginator->items()),
@@ -121,7 +123,7 @@ final class SaleController
     {
         $this->accessGuard->ensureAccessible($sale);
 
-        return response()->json(['data' => new SaleResource($sale->load('lines', 'customer'))]);
+        return response()->json(['data' => new SaleResource($sale->load('lines', 'customer', 'cashSession.openedBy'))]);
     }
 
     public function cancel(Sale $sale): JsonResponse
@@ -150,17 +152,17 @@ final class SaleController
         ]);
     }
 
-    public function receiptPdf(Sale $sale): Response
+    public function receiptPdf(Sale $sale, Request $request): Response
     {
         $this->accessGuard->ensureAccessible($sale);
 
         $sale->load('lines.product', 'customer', 'payments');
         $setting = InvoiceSetting::first();
 
-        /** @phpstan-ignore return.type */
         return Pdf::view('pdf.receipt', compact('sale', 'setting'))
             ->name("receipt-{$sale->number}.pdf")
-            ->download();
+            ->download()
+            ->toResponse($request);
     }
 
     public function confirm(ConfirmSaleRequest $request, Sale $sale): JsonResponse

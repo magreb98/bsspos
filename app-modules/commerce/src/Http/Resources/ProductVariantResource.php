@@ -23,7 +23,7 @@ final class ProductVariantResource extends JsonResource
             'created_at'  => $this->created_at,
             'updated_at'  => $this->updated_at,
             'product'     => new ProductResource($this->whenLoaded('product')),
-            'stockLevels' => StockLevelResource::collection($this->whenLoaded('stockLevels')),
+            'stock_levels' => StockLevelResource::collection($this->whenLoaded('stockLevels')),
         ];
     }
 }

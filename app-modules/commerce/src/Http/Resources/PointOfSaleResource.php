@@ -21,8 +21,8 @@ final class PointOfSaleResource extends JsonResource
             'active'                 => $this->active,
             'created_at'             => $this->created_at,
             'updated_at'             => $this->updated_at,
-            'organizationalUnit'     => new OrganizationalUnitResource($this->whenLoaded('organizationalUnit')),
-            'cashRegisters'          => CashRegisterResource::collection($this->whenLoaded('cashRegisters')),
+            'organizational_unit'    => new OrganizationalUnitResource($this->whenLoaded('organizationalUnit')),
+            'cash_registers'         => CashRegisterResource::collection($this->whenLoaded('cashRegisters')),
         ];
     }
 }

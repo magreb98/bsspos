@@ -83,19 +83,19 @@
 <div class="summary">
   <div class="summary-box">
     <div class="label">Total vente</div>
-    <div class="value">{{ number_format($schedule->total, 0, ',', '\u{202F}') }}&nbsp;FCFA</div>
+    <div class="value">{{ number_format($schedule->total, 0, ',', "\u{00A0}") }}&nbsp;FCFA</div>
   </div>
   <div class="summary-box">
     <div class="label">Acompte versé</div>
-    <div class="value">{{ number_format($schedule->deposit, 0, ',', '\u{202F}') }}&nbsp;FCFA</div>
+    <div class="value">{{ number_format($schedule->deposit, 0, ',', "\u{00A0}") }}&nbsp;FCFA</div>
   </div>
   <div class="summary-box">
     <div class="label">Versements réglés</div>
-    <div class="value">{{ number_format($paid, 0, ',', '\u{202F}') }}&nbsp;FCFA</div>
+    <div class="value">{{ number_format($paid, 0, ',', "\u{00A0}") }}&nbsp;FCFA</div>
   </div>
   <div class="summary-box" style="border-color:#1a1a1a">
     <div class="label">Reste dû</div>
-    <div class="value">{{ number_format(max(0, $remaining), 0, ',', '\u{202F}') }}&nbsp;FCFA</div>
+    <div class="value">{{ number_format(max(0, $remaining), 0, ',', "\u{00A0}") }}&nbsp;FCFA</div>
   </div>
 </div>
 
@@ -117,7 +117,7 @@
     <tr>
       <td class="c">{{ $i + 1 }}</td>
       <td>{{ \Carbon\Carbon::parse($inst->due_on)->format('d/m/Y') }}</td>
-      <td class="r">{{ number_format($inst->amount, 0, ',', '\u{202F}') }}&nbsp;FCFA</td>
+      <td class="r">{{ number_format($inst->amount, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td>
       <td class="c">
         @if($inst->paid_at !== null)
           <span class="badge-paid">RÉGLÉ</span>

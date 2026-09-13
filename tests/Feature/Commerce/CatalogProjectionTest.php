@@ -19,7 +19,7 @@ use Modules\Commerce\Internal\Models\Family;
 use Modules\Commerce\Internal\Models\OrganizationalUnit;
 use Modules\Commerce\Internal\Models\PointOfSale;
 use Modules\Commerce\Internal\Models\Product;
-use Modules\Commerce\Internal\Models\StockLevel;
+use Modules\Commerce\Internal\Models\StockMovement;
 use Modules\Commerce\Internal\Services\CatalogProjectionService;
 use Modules\Commerce\Public\CatalogProjection;
 use Modules\Commerce\Public\Enums\Availability;
@@ -52,12 +52,13 @@ function makeCatalogPos(string $name): PointOfSale
     return PointOfSale::create(['name' => $name, 'organizational_unit_id' => $unit->id, 'active' => true]);
 }
 
-function addStock(PointOfSale $pos, Product $product, int $quantity): StockLevel
+function addStock(PointOfSale $pos, Product $product, int $quantity): StockMovement
 {
-    return StockLevel::create([
+    return StockMovement::create([
         'point_of_sale_id' => $pos->id,
         'product_id' => $product->id,
         'quantity' => $quantity,
+        'occurred_at' => now(),
     ]);
 }
 

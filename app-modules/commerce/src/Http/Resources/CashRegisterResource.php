@@ -21,7 +21,7 @@ final class CashRegisterResource extends JsonResource
             'active'           => $this->active,
             'created_at'       => $this->created_at,
             'updated_at'       => $this->updated_at,
-            'pointOfSale'      => new PointOfSaleResource($this->whenLoaded('pointOfSale')),
+            'point_of_sale'    => new PointOfSaleResource($this->whenLoaded('pointOfSale')),
         ];
     }
 }

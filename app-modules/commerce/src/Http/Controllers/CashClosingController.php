@@ -44,4 +44,9 @@ final class CashClosingController
 
         return response()->json(['data' => new CashClosingResource($closing)]);
     }
+
+    public function expected(CashSession $cashSession): JsonResponse
+    {
+        return response()->json(['data' => $this->service->computeExpected($cashSession)]);
+    }
 }

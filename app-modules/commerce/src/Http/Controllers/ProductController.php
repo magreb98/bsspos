@@ -45,7 +45,7 @@ final class ProductController
 
     public function show(Product $product): JsonResponse
     {
-        $product->load('images');
+        $product->load('images', 'family');
 
         return response()->json(['data' => new ProductResource($product)]);
     }

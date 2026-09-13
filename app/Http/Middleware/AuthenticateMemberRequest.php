@@ -44,9 +44,15 @@ final class AuthenticateMemberRequest
 
         // A member whose password was never rotated off its initial
         // (phone-number-derived) value must change it before doing anything
-        // else — except calling the change-password endpoint itself, or the
-        // account could never get unstuck.
-        if ($memberToken->member->must_change_password && ! $request->routeIs('commerce.auth.change-password')) {
+        // else — except calling the change-password endpoint itself (or the
+        // account could never get unstuck) and 'me'/'logout', which the
+        // frontend needs to be able to reach unconditionally: 'me' is how it
+        // discovers must_change_password in the first place (e.g. on a page
+        // refresh, well after login already happened), and 'logout' must
+        // always be reachable so a stuck member can at least sign out.
+        $exemptRoutes = ['commerce.auth.change-password', 'commerce.auth.me', 'commerce.auth.logout'];
+
+        if ($memberToken->member->must_change_password && ! $request->routeIs($exemptRoutes)) {
             return response()->json([
                 'code'    => 'MUST_CHANGE_PASSWORD',
                 'message' => 'Vous devez changer votre mot de passe avant de continuer.',

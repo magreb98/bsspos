@@ -14,7 +14,7 @@ final class CatalogProjectionService
 {
     public function rebuild(Product $product): CatalogProjection
     {
-        $totalQuantity = (int) DB::table('stock_levels')
+        $totalQuantity = (int) DB::table('stock_movements')
             ->where('product_id', $product->id)
             ->sum('quantity');
 

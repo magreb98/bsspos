@@ -65,10 +65,10 @@
     <tr>
       <td>{{ $line->designation }}</td>
       <td class="r">{{ $line->quantity }}</td>
-      <td class="r">{{ number_format($line->unit_price?->toInt() ?? 0, 0, ',', '\u{202F}') }}</td>
-      <td class="r">{{ ($line->discount_amount?->toInt() ?? 0) > 0 ? number_format($line->discount_amount->toInt(), 0, ',', '\u{202F}') : '—' }}</td>
+      <td class="r">{{ number_format($line->unit_price?->toInt() ?? 0, 0, ',', "\u{00A0}") }}</td>
+      <td class="r">{{ ($line->discount_amount?->toInt() ?? 0) > 0 ? number_format($line->discount_amount->toInt(), 0, ',', "\u{00A0}") : '—' }}</td>
       <td class="r">{{ $line->vat_rate }}&nbsp;%</td>
-      <td class="r">{{ number_format($line->line_total_including_tax?->toInt() ?? 0, 0, ',', '\u{202F}') }}</td>
+      <td class="r">{{ number_format($line->line_total_including_tax?->toInt() ?? 0, 0, ',', "\u{00A0}") }}</td>
     </tr>
     @endforeach
   </tbody>
@@ -76,9 +76,9 @@
 
 <div class="totals-wrap">
   <table class="totals-table">
-    <tr><td>Total HT</td><td class="r">{{ number_format($sale->total_excluding_tax?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
-    <tr><td>TVA</td><td class="r">{{ number_format($sale->total_tax?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
-    <tr class="grand"><td>TOTAL TTC</td><td class="r">{{ number_format($sale->total_including_tax?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</td></tr>
+    <tr><td>Total HT</td><td class="r">{{ number_format($sale->total_excluding_tax?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
+    <tr><td>TVA</td><td class="r">{{ number_format($sale->total_tax?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
+    <tr class="grand"><td>TOTAL TTC</td><td class="r">{{ number_format($sale->total_including_tax?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</td></tr>
   </table>
 </div>
 
@@ -92,7 +92,7 @@
         &nbsp;({{ $p->amount_original }}&nbsp;{{ $p->currency_code }})
       @endif
     </span>
-    <span>{{ number_format($p->amount?->toInt() ?? 0, 0, ',', '\u{202F}') }}&nbsp;FCFA</span>
+    <span>{{ number_format($p->amount?->toInt() ?? 0, 0, ',', "\u{00A0}") }}&nbsp;FCFA</span>
   </div>
   @endforeach
 </div>

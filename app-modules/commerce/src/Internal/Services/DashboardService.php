@@ -7,9 +7,53 @@ namespace Modules\Commerce\Internal\Services;
 use App\Platform\Identity\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Modules\Commerce\Internal\Models\DailyAggregate;
 
 final class DashboardService
 {
+    /**
+     * Increments (or creates) the day's rollup for a POS — called at the
+     * moment a sale is confirmed (or a return is recorded), since nothing
+     * else keeps daily_aggregates in sync and the dashboard reads only
+     * from this table for performance (see consolidate()).
+     */
+    public function record(string $pointOfSaleId, CarbonInterface $date, int $saleCountDelta, int $excludingTaxDelta, int $taxDelta, int $includingTaxDelta): void
+    {
+        $dateStr = $date->toDateString();
+
+        DB::transaction(function () use ($pointOfSaleId, $dateStr, $saleCountDelta, $excludingTaxDelta, $taxDelta, $includingTaxDelta): void {
+            $aggregate = DailyAggregate::query()
+                ->where('point_of_sale_id', $pointOfSaleId)
+                ->where('date', $dateStr)
+                ->lockForUpdate()
+                ->first();
+
+            if ($aggregate === null) {
+                DailyAggregate::create([
+                    'point_of_sale_id'    => $pointOfSaleId,
+                    'date'                => $dateStr,
+                    'sale_count'          => max(0, $saleCountDelta),
+                    'total_excluding_tax' => $excludingTaxDelta,
+                    'total_tax'           => $taxDelta,
+                    'total_including_tax' => $includingTaxDelta,
+                    'is_provisional'      => true,
+                    'computed_at'         => now(),
+                ]);
+
+                return;
+            }
+
+            $aggregate->update([
+                'sale_count'          => $aggregate->sale_count + $saleCountDelta,
+                'total_excluding_tax' => $aggregate->total_excluding_tax + $excludingTaxDelta,
+                'total_tax'           => $aggregate->total_tax + $taxDelta,
+                'total_including_tax' => $aggregate->total_including_tax + $includingTaxDelta,
+                'is_provisional'      => true,
+                'computed_at'         => now(),
+            ]);
+        });
+    }
+
     /**
      * Consolidated dashboard for a user's visible POS over a date range.
      * Queries pre-computed daily_aggregates — O(POS × days), not O(sales).

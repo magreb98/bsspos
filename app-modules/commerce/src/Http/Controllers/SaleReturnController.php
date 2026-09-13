@@ -15,9 +15,14 @@ use Modules\Commerce\Internal\Models\CustomerCredit;
 use Modules\Commerce\Internal\Models\Sale;
 use Modules\Commerce\Internal\Models\SaleLine;
 use Modules\Commerce\Internal\Models\StockMovement;
+use Modules\Commerce\Internal\Services\DashboardService;
 
 final class SaleReturnController
 {
+    public function __construct(private readonly DashboardService $dashboardService)
+    {
+    }
+
     public function store(StoreSaleReturnRequest $request, Sale $sale): JsonResponse
     {
         if (! $sale->isConfirmed()) {
@@ -58,6 +63,7 @@ final class SaleReturnController
 
         $returnSale = DB::transaction(function () use ($sale, $returnLines): Sale {
             $session = $sale->cashSession;
+            $pos     = $session?->cashRegister?->pointOfSale;
 
             $ret = Sale::create([
                 'cash_session_id'   => $sale->cash_session_id,
@@ -98,8 +104,6 @@ final class SaleReturnController
 
                 // Add stock back (positive movement) for non-service products
                 if ($line->product !== null && $line->product->granularity !== Granularity::Service) {
-                    $pos = $session?->cashRegister?->pointOfSale;
-
                     if ($pos !== null) {
                         StockMovement::create([
                             'point_of_sale_id' => $pos->id,
@@ -122,6 +126,10 @@ final class SaleReturnController
                 'total_tax'           => $totalTax,
                 'total_including_tax' => $totalTtc,
             ]);
+
+            if ($pos !== null) {
+                $this->dashboardService->record($pos->id, now(), 0, $totalHt, $totalTax, $totalTtc);
+            }
 
             // Issue a credit note if the original sale had a customer
             if ($sale->client_id !== null && $totalTtc < 0) {

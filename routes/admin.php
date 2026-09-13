@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Admin\AdminUserController;
+use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DomainController;
+use App\Http\Controllers\Admin\HealthController;
+use App\Http\Controllers\Admin\ImpersonationController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\TenantController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +37,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me', [AuthController::class, 'me'])->name('me');
+        Route::post('change-password', [AuthController::class, 'changePassword'])->name('change-password');
 
         // ── Tenants ──────────────────────────────────────────────────────────
         Route::get('tenants', [TenantController::class, 'index'])->name('tenants.index');
@@ -59,6 +64,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
         // ── Tenant users ─────────────────────────────────────────────────────
         Route::get('tenants/{tenant}/users', [TenantController::class, 'users'])->name('tenants.users');
+        Route::patch('tenants/{tenant}/users/{userId}', [TenantController::class, 'updateUser'])->name('tenants.users.update');
+
+        // ── Tenant impersonation (super-admin only) ───────────────────────────
+        Route::post('tenants/{tenant}/impersonate', [ImpersonationController::class, 'impersonate'])->name('tenants.impersonate');
 
         // ── MCP Audit logs ───────────────────────────────────────────────────
         Route::get('audit-logs', [AuditController::class, 'index'])->name('audit-logs.index');
@@ -66,5 +75,16 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
         // ── Tenant daily metrics ─────────────────────────────────────────────
         Route::get('tenants/{tenant}/metrics/daily', [StatsController::class, 'tenantDaily'])->name('tenants.metrics.daily');
+
+        // ── Analytics ────────────────────────────────────────────────────────
+        Route::get('analytics/growth', [AnalyticsController::class, 'growth'])->name('analytics.growth');
+        Route::get('analytics/revenue', [AnalyticsController::class, 'revenue'])->name('analytics.revenue');
+
+        // ── System health ─────────────────────────────────────────────────────
+        Route::get('health', [HealthController::class, 'index'])->name('health');
+
+        // ── Platform settings ─────────────────────────────────────────────────
+        Route::get('settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::patch('settings', [SettingsController::class, 'update'])->name('settings.update');
     });
 });

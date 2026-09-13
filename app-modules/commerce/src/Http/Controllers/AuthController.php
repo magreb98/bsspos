@@ -106,11 +106,12 @@ final class AuthController
 
         return response()->json([
             'data' => [
-                'id'                => $member->id,
-                'name'              => trim($member->first_name . ' ' . $member->last_name),
-                'phone'             => $member->phone,
-                'role'              => $role,
-                'last_connected_at' => $member->last_connected_at?->toIso8601String(),
+                'id'                    => $member->id,
+                'name'                  => trim($member->first_name . ' ' . $member->last_name),
+                'phone'                 => $member->phone,
+                'role'                  => $role,
+                'last_connected_at'     => $member->last_connected_at?->toIso8601String(),
+                'must_change_password'  => $member->must_change_password,
             ],
         ]);
     }

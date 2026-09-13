@@ -19,7 +19,7 @@ final class PointOfSaleController
     {
         $user = $request->user();
 
-        $query = PointOfSale::with(['cashRegisters'])->orderBy('name');
+        $query = PointOfSale::with(['cashRegisters', 'organizationalUnit'])->orderBy('name');
 
         // Proprietaires and users with pos.write see every POS.
         // Gerants and vendeurs see only their assigned POS.
