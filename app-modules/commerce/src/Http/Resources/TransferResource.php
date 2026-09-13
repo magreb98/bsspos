@@ -24,8 +24,8 @@ final class TransferResource extends JsonResource
             'notes'               => $this->notes,
             'created_at'          => $this->created_at,
             'updated_at'          => $this->updated_at,
-            'sourcePos'           => new PointOfSaleResource($this->whenLoaded('sourcePos')),
-            'destinationPos'      => new PointOfSaleResource($this->whenLoaded('destinationPos')),
+            'source_pos'          => new PointOfSaleResource($this->whenLoaded('sourcePos')),
+            'destination_pos'     => new PointOfSaleResource($this->whenLoaded('destinationPos')),
             'lines'               => TransferLineResource::collection($this->whenLoaded('lines')),
         ];
     }

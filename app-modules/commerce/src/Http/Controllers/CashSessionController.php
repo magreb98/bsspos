@@ -58,6 +58,10 @@ final class CashSessionController
             return response()->json(['code' => 'REGISTER_NOT_FOUND', 'message' => 'Caisse introuvable.', 'champ' => 'cash_register_id'], 404);
         }
 
+        if (! $register->active) {
+            return response()->json(['code' => 'REGISTER_INACTIVE', 'message' => 'Cette caisse est désactivée.', 'champ' => 'cash_register_id'], 409);
+        }
+
         $existing = CashSession::query()
             ->where('cash_register_id', $register->id)
             ->where('state', SessionState::Open)

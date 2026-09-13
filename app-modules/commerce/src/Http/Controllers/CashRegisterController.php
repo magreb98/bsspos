@@ -16,7 +16,7 @@ final class CashRegisterController
 {
     public function index(Request $request): JsonResponse
     {
-        $query = CashRegister::with('pointOfSale');
+        $query = CashRegister::with('pointOfSale')->where('active', true);
 
         if ($request->filled('point_of_sale_id')) {
             $query->where('point_of_sale_id', $request->input('point_of_sale_id'));
